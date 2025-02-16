@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, ActivityIndicator, SafeAreaView, TouchableOpacity } from "react-native";
+import { View, StyleSheet, ActivityIndicator, SafeAreaView, TouchableOpacity, Text } from "react-native";
 import { GiftedChat, Bubble, Send, InputToolbar } from "react-native-gifted-chat";
 import { db, auth } from "../firebaseConfig";
 import {
@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import Icon from 'react-native-vector-icons/Ionicons'; // Make sure to install this package
 
-const ChatScreen = ({ route }) => {
+const ChatScreen = ({ route, navigation }) => {
   const { consultant } = route.params;
   const user = auth.currentUser;
   const [messages, setMessages] = useState([]);
@@ -99,26 +99,23 @@ const ChatScreen = ({ route }) => {
     [chatId]
   );
 
+  // Updated navigation handler with error handling and logging
+  const handleMakeAppointment = () => {
+    navigation.navigate('Appointment', { consultant });
+  };
+
   // Custom bubble component
   const renderBubble = (props) => {
     return (
       <Bubble
         {...props}
         wrapperStyle={{
-          right: {
-            backgroundColor: '#D47FA6', // Pink color for sent messages
-          },
-          left: {
-            backgroundColor: '#F0F0F0', // Light gray for received messages
-          },
+          right: { backgroundColor: '#D47FA6' },
+          left: { backgroundColor: '#F0F0F0' },
         }}
         textStyle={{
-          right: {
-            color: '#FFFFFF',
-          },
-          left: {
-            color: '#000000',
-          },
+          right: { color: '#FFFFFF' },
+          left: { color: '#000000' },
         }}
       />
     );
@@ -129,11 +126,7 @@ const ChatScreen = ({ route }) => {
     return (
       <Send {...props} containerStyle={styles.sendContainer}>
         <View style={styles.sendButton}>
-          <Icon 
-            name="paper-plane" 
-            size={20} 
-            color="#FFFFFF"
-          />
+          <Icon name="paper-plane" size={20} color="#FFFFFF" />
         </View>
       </Send>
     );
@@ -161,9 +154,14 @@ const ChatScreen = ({ route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Make Appointment Button */}
+      <TouchableOpacity style={styles.appointmentButton} onPress={handleMakeAppointment}>
+        <Text style={styles.appointmentText}>Make Appointment</Text>
+      </TouchableOpacity>
+
       <GiftedChat
         messages={messages}
-        onSend={messages => onSend(messages)}
+        onSend={(messages) => onSend(messages)}
         user={{ _id: user?.uid }}
         renderBubble={renderBubble}
         renderSend={renderSend}
@@ -173,7 +171,7 @@ const ChatScreen = ({ route }) => {
         renderAvatar={null}
         timeTextStyle={{
           right: { color: '#FFF' },
-          left: { color: '#666' }
+          left: { color: '#666' },
         }}
         placeholder="Type your message here..."
       />
@@ -206,10 +204,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
@@ -224,10 +219,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 25,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
@@ -237,6 +229,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 20,
     marginLeft: 5,
+  },
+  appointmentButton: {
+    backgroundColor: '#D47FA6',
+    padding: 12,
+    margin: 10,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  appointmentText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

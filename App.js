@@ -18,6 +18,8 @@ import BirthingCenterLocator from './component/BirthingCenterLocator'; // Import
 import ConsultantScreen from './component/ConsultantScreen'; // Import ConsultantScreen
 import ConsultantDetailScreen from './component/ConsultantDetailScreen'; // Import the new screen
 import ChatScreen from './component/ChatScreen'; // Import the ChatScreen
+import AppointmentScreen from './component/AppointmentScreen'; // Import the ChatScreen
+
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -88,6 +90,19 @@ export default function App() {
         <Stack.Screen name="ConsultantDetail" component={ConsultantDetailScreen} />
         {/* Chat Screen */}
         <Stack.Screen name="Chat" component={ChatScreen} />
+        {/* Appointment Screen - adding options for better UX */}
+        <Stack.Screen 
+          name="Appointment" 
+          component={AppointmentScreen}
+          options={{
+            headerShown: true,
+            title: 'Book Appointment',
+            headerStyle: {
+              backgroundColor: '#FFF4E6',
+            },
+            headerTintColor: '#D47FA6',
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
