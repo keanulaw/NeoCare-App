@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db, auth } from '../firebaseConfig';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 
 const AppointmentScreen = ({ route, navigation }) => {
   const { consultant } = route.params;
@@ -19,6 +19,15 @@ const AppointmentScreen = ({ route, navigation }) => {
       }
 
       const user = auth.currentUser;
+      let fullName = user.displayName || "User";
+
+      // Fetch full name from Firestore if displayName is not set
+      if (!user.displayName) {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          fullName = userDoc.data().fullName || "User";
+        }
+      }
       
       // Create a combined date-time object
       const [time, modifier] = selectedTime.split(' ');
@@ -36,7 +45,7 @@ const AppointmentScreen = ({ route, navigation }) => {
         consultantId: consultant.id,
         consultantName: consultant.name,
         userId: user.uid,
-        userName: user.displayName || "User",
+        fullName: fullName, // Use the fetched or default full name
         date: appointmentDate,  // Use the combined date-time
         time: selectedTime,
         status: "pending",
