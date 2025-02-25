@@ -26,6 +26,7 @@ const RegisterScreen = ({ navigation }) => {
 
       // Store user information in Firestore with UID as document ID
       await setDoc(doc(db, 'users', user.uid), {
+        userId: user.uid,
         fullName: fullName,
         email: email,
         role: role,

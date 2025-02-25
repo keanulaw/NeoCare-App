@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet, ActivityIndicator, SafeAreaView, TouchableOpacity, Text } from "react-native";
+import { View, StyleSheet, ActivityIndicator, SafeAreaView, TouchableOpacity, Text, FlatList } from "react-native";
 import { GiftedChat, Bubble, Send, InputToolbar } from "react-native-gifted-chat";
 import { db, auth } from "../firebaseConfig";
 import {
@@ -12,96 +12,67 @@ import {
   doc,
   orderBy,
   onSnapshot,
+  serverTimestamp,
 } from "firebase/firestore";
 import Icon from 'react-native-vector-icons/Ionicons'; // Make sure to install this package
 
 const ChatScreen = ({ route, navigation }) => {
-  const { consultant } = route.params;
+  const { chatDetails } = route.params;
   const user = auth.currentUser;
   const [messages, setMessages] = useState([]);
-  const [chatId, setChatId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch or create chat document
   useEffect(() => {
-    const fetchChat = async () => {
-      try {
-        const participants = [user.uid, consultant.id].sort();
-        console.log("RN Participants:", participants);
-
-        const chatsRef = collection(db, "chats");
-        const q = query(chatsRef, where("participants", "==", participants));
-        
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          console.log("RN Existing Chat ID:", snapshot.docs[0].id);
-          setChatId(snapshot.docs[0].id);
-        } else {
-          const newChatRef = doc(chatsRef);
-          await setDoc(newChatRef, {
-            participants,
-            parentUid: user.uid,
-            doctorUid: consultant.userId,
-            createdAt: new Date(),
-          });
-          console.log("RN New Chat ID:", newChatRef.id);
-          setChatId(newChatRef.id);
-        }
-      } catch (error) {
-        console.error("RN Chat Error:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (user?.uid && consultant?.id) {
-      fetchChat();
+    if (!chatDetails || !chatDetails.chatId) {
+      console.error("No chatId provided to ChatScreen");
+      return;
     }
-  }, [user?.uid, consultant?.id]);
 
-  // Fetch messages for the current chat
-  useEffect(() => {
-    if (!chatId) return;
-
-    const messagesRef = collection(db, "chats", chatId, "messages");
+    console.log("Fetching messages for chatId:", chatDetails.chatId);
+    // Use the subcollection "messages" under the specific chat document
+    const messagesRef = collection(db, "chats", chatDetails.chatId, "messages");
     const q = query(messagesRef, orderBy("createdAt", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const messagesData = snapshot.docs.map((doc) => ({
         _id: doc.id,
         ...doc.data(),
-        createdAt: doc.data().createdAt.toDate(),
+        createdAt: doc.data().createdAt?.toDate(),
       }));
       setMessages(messagesData);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching messages:", error);
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [chatId]);
+  }, [chatDetails]);
 
   // Handle sending messages
   const onSend = useCallback(
     async (messages = []) => {
       try {
-        if (!chatId) {
+        if (!chatDetails || !chatDetails.chatId) {
           console.log("RN Chat ID not found!");
           return;
         }
 
-        await addDoc(collection(db, "chats", chatId, "messages"), {
+        await addDoc(collection(db, "chats", chatDetails.chatId, "messages"), {
           text: messages[0].text,
           user: messages[0].user,
-          createdAt: new Date(),
+          createdAt: serverTimestamp(),
         });
       } catch (error) {
         console.error("RN Send Error:", error);
       }
     },
-    [chatId]
+    [chatDetails]
   );
 
   // Updated navigation handler with error handling and logging
   const handleMakeAppointment = () => {
-    navigation.navigate('Appointment', { consultant });
+    navigation.navigate('Appointment', { consultant: chatDetails.consultant });
   };
 
   // Custom bubble component

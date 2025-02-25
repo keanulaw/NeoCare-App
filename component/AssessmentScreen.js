@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { format } from 'date-fns';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Calendar } from 'react-native-calendars';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import { getAuth } from 'firebase/auth'; // Import Firebase auth from JS SDK
+import { getAuth } from 'firebase/auth';
 
-const feelings = {
+const moodEmojis = {
   Happy: '😊',
   Sad: '😢',
   Angry: '😡',
@@ -16,9 +16,10 @@ const feelings = {
 };
 
 const AssessmentScreen = ({ navigation }) => {
-  const [moodEntries, setMoodEntries] = useState([]);
-  const auth = getAuth(); // Initialize Firebase Auth
-  const userId = auth.currentUser?.uid; // Get the current user's ID
+  const [moods, setMoods] = useState({});
+  const [monthlyAverage, setMonthlyAverage] = useState({});
+  const auth = getAuth();
+  const userId = auth.currentUser?.uid;
 
   useEffect(() => {
     if (!userId) {
@@ -26,52 +27,73 @@ const AssessmentScreen = ({ navigation }) => {
       return;
     }
 
-    const fetchMoodEntries = async () => {
+    const fetchMoods = async () => {
       try {
-        const q = query(collection(db, 'moods'), where('userId', '==', userId));
-        const querySnapshot = await getDocs(q);
-        const entries = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const moodCollection = collection(db, 'moods');
+        const moodSnapshot = await getDocs(moodCollection);
+        const moodData = {};
 
-        // Sort entries by date in descending order
-        entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+        moodSnapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.userId === userId) {
+            const date = data.date; // Assuming date is stored in 'YYYY-MM-DD' format
+            moodData[date] = { id: doc.id, mood: data.mood, message: data.message };
+          }
+        });
 
-        setMoodEntries(entries);
+        setMoods(moodData);
+        calculateMonthlyAverage(moodData);
       } catch (error) {
-        console.error('Error fetching mood entries: ', error);
+        console.error('Error fetching moods: ', error);
       }
     };
 
-    fetchMoodEntries();
+    fetchMoods();
   }, [userId]);
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.entryContainer}
-      onPress={() => navigation.navigate('MoodDetail', { moodData: item })}
-    >
-      <View style={styles.dateContainer}>
-        <Text style={styles.date}>{format(new Date(item.date), 'MMM')}</Text>
-        <Text style={styles.day}>{format(new Date(item.date), 'd')}</Text>
-      </View>
-      <View style={styles.content}>
-        <Text style={styles.moodText}>You feel {item.mood}</Text>
-        <Text style={styles.emoji}>{feelings[item.mood]}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const calculateMonthlyAverage = (moodData) => {
+    const monthlyData = {};
+
+    Object.keys(moodData).forEach(date => {
+      const month = date.slice(0, 7); // Extract 'YYYY-MM' from 'YYYY-MM-DD'
+      if (!monthlyData[month]) {
+        monthlyData[month] = { total: 0, count: 0 };
+      }
+      // Assuming mood is a numeric value for simplicity
+      monthlyData[month].total += moodData[date].mood;
+      monthlyData[month].count += 1;
+    });
+
+    const averages = {};
+    Object.keys(monthlyData).forEach(month => {
+      averages[month] = (monthlyData[month].total / monthlyData[month].count).toFixed(2);
+    });
+
+    setMonthlyAverage(averages);
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Assessment</Text>
-      <FlatList
-        data={moodEntries}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
+      <Calendar
+        markedDates={Object.keys(moods).reduce((acc, date) => {
+          const mood = moods[date].mood;
+          acc[date] = { marked: true, dotColor: '#D47FA6', customStyles: { text: { text: moodEmojis[mood] || '' } } };
+          return acc;
+        }, {})}
+        onDayPress={(day) => {
+          const selectedMood = moods[day.dateString];
+          if (selectedMood) {
+            navigation.navigate('MoodDetail', { moodData: selectedMood });
+          }
+        }}
       />
+      <ScrollView style={styles.averageContainer}>
+        {Object.keys(monthlyAverage).map(month => (
+          <Text key={month} style={styles.averageText}>
+            {month}: Average Mood - {monthlyAverage[month]}
+          </Text>
+        ))}
+      </ScrollView>
     </View>
   );
 };
@@ -79,57 +101,16 @@ const AssessmentScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-    padding: 16,
+    backgroundColor: '#FFF4E6',
+    padding: 20,
   },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
+  averageContainer: {
+    marginTop: 20,
   },
-  listContent: {
-    paddingBottom: 20,
-  },
-  entryContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  dateContainer: {
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  date: {
+  averageText: {
     fontSize: 16,
-    fontWeight: 'bold',
     color: '#333',
-  },
-  day: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  content: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  moodText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  emoji: {
-    fontSize: 24,
+    marginBottom: 10,
   },
 });
 

@@ -2,11 +2,18 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, Button, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { db, auth } from '../firebaseConfig'; // Use the already-initialized instance
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { query, where, getDocs, setDoc } from 'firebase/firestore';
 
 const ConsultantDetailScreen = ({ route, navigation }) => {
   const { consultant } = route.params;
 
-  console.log('Consultant:', consultant); // Add this line to log the consultant object
+  console.log('Consultant:', consultant); // Log to verify consultant data
+
+  // Ensure consultant has necessary fields
+  if (!consultant.id || !consultant.userId) {
+    console.error("Consultant data is incomplete:", consultant);
+    return null; // Or handle the error appropriately
+  }
 
   const handleMakeAppointment = async () => {
     try {
@@ -35,6 +42,35 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
     } catch (error) {
       console.error("Firestore Error:", error); // Logs the exact error
       Alert.alert("Error", `Failed to send appointment request. ${error.message}`);
+    }
+  };
+
+  const handleChatNavigation = async () => {
+    try {
+      // Check if a chat already exists
+      const participants = [auth.currentUser.uid, consultant.userId].sort();
+      const chatsRef = collection(db, "chats");
+      const q = query(chatsRef, where("participants", "==", participants));
+      const snapshot = await getDocs(q);
+
+      let chatId;
+      if (!snapshot.empty) {
+        chatId = snapshot.docs[0].id;
+      } else {
+        const newChatRef = doc(chatsRef);
+        await setDoc(newChatRef, {
+          participants,
+          parentUid: auth.currentUser.uid,
+          doctorUid: consultant.userId,
+          createdAt: new Date(),
+        });
+        chatId = newChatRef.id;
+      }
+
+      // Navigate to ChatScreen with chatId and consultant details
+      navigation.navigate('Chat', { chatDetails: { chatId, consultant } });
+    } catch (error) {
+      console.error("Error navigating to chat:", error);
     }
   };
 
@@ -71,7 +107,7 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
         <Text style={styles.sectionContent}>Phone: {consultant.contactInfo}</Text>
       </View>
       <Button title="Make Appointment" onPress={handleMakeAppointment} style={styles.appointmentButton} />
-      <TouchableOpacity style={styles.chatButton} onPress={() => navigation.navigate('Chat', { consultant })}>
+      <TouchableOpacity style={styles.chatButton} onPress={handleChatNavigation}>
         <Text style={styles.chatButtonText}>Chat with Consultant</Text>
       </TouchableOpacity>
     </ScrollView>
