@@ -92,7 +92,7 @@ export default function App() {
         <Stack.Screen name="Chat" component={ChatScreen} />
         {/* Appointment Screen - adding options for better UX */}
         <Stack.Screen 
-          name="Appointment" 
+          name="AppointmentScreen"
           component={AppointmentScreen}
           options={{
             headerShown: true,

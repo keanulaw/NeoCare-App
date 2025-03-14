@@ -72,7 +72,7 @@ const ChatScreen = ({ route, navigation }) => {
 
   // Updated navigation handler with error handling and logging
   const handleMakeAppointment = () => {
-    navigation.navigate('Appointment', { consultant: chatDetails.consultant });
+    navigation.navigate('AppointmentScreen', { consultant: chatDetails.consultant });
   };
 
   // Custom bubble component

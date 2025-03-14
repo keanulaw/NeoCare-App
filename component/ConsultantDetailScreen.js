@@ -15,34 +15,12 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
     return null; // Or handle the error appropriately
   }
 
-  const handleMakeAppointment = async () => {
-    try {
-      if (!auth.currentUser) {
-        Alert.alert("Not Logged In", "Please log in to make an appointment.");
-        return;
-      }
-
-      // Fetch user information from Firestore
-      const userRef = doc(db, "users", auth.currentUser.uid);
-      const userDoc = await getDoc(userRef);
-      const userFullName = userDoc.exists() ? userDoc.data().fullName : "Anonymous";
-
-      const appointmentRequest = {
-        consultantId: consultant.id,
-        consultantName: consultant.name,
-        userId: auth.currentUser.uid,
-        fullName: userFullName, // Use the full name here
-        status: "pending",
-        createdAt: serverTimestamp(),
-      };
-
-      await addDoc(collection(db, "appointmentRequests"), appointmentRequest);
-
-      Alert.alert("Success", "Your appointment request has been sent!");
-    } catch (error) {
-      console.error("Firestore Error:", error); // Logs the exact error
-      Alert.alert("Error", `Failed to send appointment request. ${error.message}`);
+  const handleMakeAppointment = () => {
+    if (!auth.currentUser) {
+      Alert.alert("Not Logged In", "Please log in to make an appointment.");
+      return;
     }
+    navigation.navigate('AppointmentScreen', { consultant });
   };
 
   const handleChatNavigation = async () => {
