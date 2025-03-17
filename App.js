@@ -19,6 +19,7 @@ import ConsultantScreen from './component/ConsultantScreen'; // Import Consultan
 import ConsultantDetailScreen from './component/ConsultantDetailScreen'; // Import the new screen
 import ChatScreen from './component/ChatScreen'; // Import the ChatScreen
 import AppointmentScreen from './component/AppointmentScreen'; // Import the ChatScreen
+import BookingsScreen from './component/BookingsScreen'; // Adjust the path as necessary
 
 
 const Stack = createStackNavigator();
@@ -102,6 +103,12 @@ export default function App() {
             },
             headerTintColor: '#D47FA6',
           }}
+        />
+        {/* Bookings Screen */}
+        <Stack.Screen 
+          name="Bookings" 
+          component={BookingsScreen} 
+          options={{ title: 'My Bookings' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

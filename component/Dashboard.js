@@ -64,6 +64,13 @@ export default function Dashboard({ navigation }) {
           <Image source={require('../assets/chat-bot-icon.png')} style={styles.buttonIcon} />
           <Text style={styles.buttonText}>Chat Bot</Text>
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.circleButton}
+          onPress={() => navigation.navigate('Bookings')}
+        >
+          <Image source={require('../assets/booking-icon.png')} style={styles.buttonIcon} />
+          <Text style={styles.buttonText}>Bookings</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Upcoming Appointments */}
