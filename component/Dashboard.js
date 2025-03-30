@@ -1,10 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, Alert, Linking } from 'react-native';
 import { db } from '../firebaseConfig'; // Import Firestore
 import { collection, getDocs } from 'firebase/firestore';
+import CustomButton from '../component/Button';
 
 export default function Dashboard({ navigation }) {
   const [data, setData] = useState([]);
+
+  const emergencyNumbers = {
+    ph: '+63123456789', // Philippines emergency number
+    hospital: '+63123456788'
+  };
+
+  const handleSOS = () => {
+    Alert.alert('Emergency Call', 'Choose service', [
+      { text: 'Police/Ambulance', onPress: () => Linking.openURL(`tel:${emergencyNumbers.ph}`) },
+      { text: 'Hospital', onPress: () => Linking.openURL(`tel:${emergencyNumbers.hospital}`) },
+      { text: 'Cancel', style: 'cancel' }
+    ]);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -86,6 +100,9 @@ export default function Dashboard({ navigation }) {
           <Text style={styles.appointmentDetails}>Glucose screening test:</Text>
         </View>
       </View>
+
+      {/* SOS Button */}
+      <CustomButton title="EMERGENCY SOS" onPress={handleSOS} />
 
       {data.map((item, index) => (
         <Text key={index}>{JSON.stringify(item)}</Text>

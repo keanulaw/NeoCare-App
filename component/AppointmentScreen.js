@@ -3,109 +3,122 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Platform, Scrol
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db, auth } from '../firebaseConfig';
 import { collection, addDoc, serverTimestamp, doc, getDoc, query, where, getDocs } from 'firebase/firestore';
+import moment from 'moment-timezone';
+
+const getNextAvailableDate = (availableDays) => {
+  const phTime = moment().tz('Asia/Manila');
+  let date = phTime.clone().startOf('day');
+  for (let i = 0; i < 7; i++) {
+    const currentDay = date.format('dddd');
+    if (availableDays.includes(currentDay)) {
+      return date.toDate();
+    }
+    date.add(1, 'day');
+  }
+  return phTime.toDate();
+};
 
 const AppointmentScreen = ({ route, navigation }) => {
   const { consultant } = route.params;
-  
-  // State for the appointment date (if needed)
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  // Selected available day (e.g. "Monday")
-  const [selectedAvailableDay, setSelectedAvailableDay] = useState(null);
-  // Selected consultation hour (represents the time slot)
+  const initialDate = getNextAvailableDate(consultant.availableDays);
+  const [selectedDate, setSelectedDate] = useState(initialDate);
   const [selectedConsultationHour, setSelectedConsultationHour] = useState(null);
-  // Selected platform (e.g. "Online")
   const [selectedPlatform, setSelectedPlatform] = useState(null);
-  // Booked time slots for the selected day (fetched from Firestore)
   const [bookedTimes, setBookedTimes] = useState([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Fetch booked consultation hours for the selected day
+  const selectedAvailableDay = moment(selectedDate).tz('Asia/Manila').format('dddd');
+
   useEffect(() => {
     const fetchBookedTimes = async () => {
-      if (selectedAvailableDay) {
-        try {
-          const q = query(
-            collection(db, "appointmentRequests"),
-            where("consultantId", "==", consultant.id),
-            where("availableDay", "==", selectedAvailableDay)
-          );
-          const querySnapshot = await getDocs(q);
-          const booked = [];
-          querySnapshot.forEach(docSnapshot => {
-            const data = docSnapshot.data();
-            if (data.consultationHour) {
-              booked.push(data.consultationHour);
-            }
-          });
-          setBookedTimes(booked);
-        } catch (error) {
-          console.error("Error fetching booked times:", error);
-        }
-      } else {
-        setBookedTimes([]);
+      try {
+        const q = query(
+          collection(db, "appointmentRequests"),
+          where("consultantId", "==", consultant.id),
+          where("availableDay", "==", selectedAvailableDay)
+        );
+        const querySnapshot = await getDocs(q);
+        const booked = [];
+        querySnapshot.forEach(docSnapshot => {
+          const data = docSnapshot.data();
+          if (data.consultationHour) booked.push(data.consultationHour);
+        });
+        setBookedTimes(booked);
+      } catch (error) {
+        console.error("Error fetching booked times:", error);
       }
     };
 
-    fetchBookedTimes();
-  }, [selectedAvailableDay, consultant.id]);
+    if (consultant.availableDays.includes(selectedAvailableDay)) {
+      fetchBookedTimes();
+    }
+  }, [selectedDate, consultant.id]);
+
+  const handleDateChange = (event, date) => {
+    setShowDatePicker(false);
+    if (date) {
+      const phTime = moment(date).tz('Asia/Manila');
+      const selectedDay = phTime.format('dddd');
+      
+      if (consultant.availableDays.includes(selectedDay)) {
+        setSelectedDate(phTime.toDate());
+        setSelectedConsultationHour(null);
+      } else {
+        Alert.alert(
+          "Invalid Day",
+          `This consultant is only available on ${consultant.availableDays.join(', ')}`
+        );
+      }
+    }
+  };
 
   const handleMakeAppointment = async () => {
-    if (!selectedAvailableDay || !selectedConsultationHour || !selectedPlatform) {
-      Alert.alert("Incomplete Selection", "Please select an available day, consultation hour, and platform.");
+    if (!selectedConsultationHour || !selectedPlatform) {
+      Alert.alert("Incomplete Selection", "Please select consultation hour and platform.");
       return;
     }
-    
+
     try {
-      if (!auth.currentUser) {
+      const user = auth.currentUser;
+      if (!user) {
         Alert.alert("Not Logged In", "Please log in to make an appointment.");
         return;
       }
-      
-      const user = auth.currentUser;
-      let fullName = user.displayName || "User";
-      
-      if (!user.displayName) {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          fullName = userDoc.data().fullName || "User";
-        }
-      }
-      
-      const appointmentRequest = {
+
+      const [time, modifier] = selectedConsultationHour.split(' ');
+      let [hours, minutes] = time.split(':');
+      hours = parseInt(hours);
+      minutes = parseInt(minutes);
+
+      if (modifier === 'PM' && hours < 12) hours += 12;
+      if (modifier === 'AM' && hours === 12) hours = 0;
+
+      const appointmentDate = new Date(selectedDate);
+      appointmentDate.setHours(hours, minutes);
+
+      await addDoc(collection(db, "appointmentRequests"), {
         consultantId: consultant.id,
         consultantName: consultant.name,
         userId: user.uid,
-        fullName: fullName,
-        date: selectedDate,
+        fullName: user.displayName || (await getDoc(doc(db, "users", user.uid))).data()?.fullName || "User",
+        date: appointmentDate,
         availableDay: selectedAvailableDay,
         consultationHour: selectedConsultationHour,
         platform: selectedPlatform,
         status: "pending",
         createdAt: serverTimestamp(),
-      };
-      
-      await addDoc(collection(db, "appointmentRequests"), appointmentRequest);
-      
+      });
+
       Alert.alert(
         "Success",
-        "Your appointment has been scheduled!",
+        "Appointment scheduled!",
         [{ text: "OK", onPress: () => navigation.navigate('ConsultantScreen') }]
       );
-      
     } catch (error) {
-      console.error("Firestore Error:", error);
-      Alert.alert("Error", `Failed to schedule appointment. ${error.message}`);
+      Alert.alert("Error", `Failed to schedule: ${error.message}`);
     }
   };
 
-  const handleDateChange = (event, date) => {
-    setShowDatePicker(false);
-    if (date) {
-      setSelectedDate(date);
-    }
-  };
-
-  // Only show consultation hours that haven't been booked for the selected day
   const availableConsultationHours = consultant.consultationHours.filter(
     hour => !bookedTimes.includes(hour)
   );
@@ -116,108 +129,79 @@ const AppointmentScreen = ({ route, navigation }) => {
       <Text style={styles.name}>Dr. {consultant.name}</Text>
       <Text style={styles.specialty}>{consultant.specialty}</Text>
 
-      {/* Date Picker */}
       <View style={styles.pickerContainer}>
-        <Text style={styles.label}>Select Date</Text>
+        <Text style={styles.label}>
+          Select Date (Available: {consultant.availableDays.join(', ')})
+        </Text>
         <TouchableOpacity 
           style={styles.pickerButton} 
           onPress={() => setShowDatePicker(true)}
         >
           <Text style={styles.pickerText}>
-            {selectedDate.toLocaleDateString()}
+            {moment(selectedDate).tz('Asia/Manila').format('LLLL')}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Available Days Selection */}
-      {consultant.availableDays && consultant.availableDays.length > 0 && (
+      {availableConsultationHours.length > 0 ? (
         <View style={styles.selectionContainer}>
-          <Text style={styles.label}>Select Available Day</Text>
+          <Text style={styles.label}>Available Times for {selectedAvailableDay}</Text>
           <View style={styles.optionsRow}>
-            {consultant.availableDays.map((day, index) => (
+            {availableConsultationHours.map((hour, index) => (
               <TouchableOpacity
                 key={index}
                 style={[
                   styles.optionButton,
-                  selectedAvailableDay === day && styles.optionButtonSelected,
+                  selectedConsultationHour === hour && styles.optionButtonSelected,
                 ]}
-                onPress={() => {
-                  setSelectedAvailableDay(day);
-                  setSelectedConsultationHour(null); // Reset time selection if day changes
-                }}
+                onPress={() => setSelectedConsultationHour(hour)}
               >
                 <Text style={[
                   styles.optionText,
-                  selectedAvailableDay === day && { color: '#fff' }
+                  selectedConsultationHour === hour && { color: '#fff' }
                 ]}>
-                  {day}
+                  {hour}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
+      ) : (
+        <Text style={styles.noAvailableText}>
+          No available times for {selectedAvailableDay}
+        </Text>
       )}
 
-      {/* Consultation Hours Selection */}
-      {selectedAvailableDay && (
-        <View style={styles.selectionContainer}>
-          <Text style={styles.label}>Select Consultation Hour</Text>
-          {availableConsultationHours.length > 0 ? (
-            <View style={styles.optionsRow}>
-              {availableConsultationHours.map((hour, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.optionButton,
-                    selectedConsultationHour === hour && styles.optionButtonSelected,
-                  ]}
-                  onPress={() => setSelectedConsultationHour(hour)}
-                >
-                  <Text style={[
-                    styles.optionText,
-                    selectedConsultationHour === hour && { color: '#fff' }
-                  ]}>
-                    {hour}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.noAvailableText}>No available times for {selectedAvailableDay}</Text>
-          )}
+      <View style={styles.selectionContainer}>
+        <Text style={styles.label}>Select Platform</Text>
+        <View style={styles.optionsRow}>
+          {consultant.platform.map((option, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.optionButton,
+                selectedPlatform === option && styles.optionButtonSelected,
+              ]}
+              onPress={() => setSelectedPlatform(option)}
+            >
+              <Text style={[
+                styles.optionText,
+                selectedPlatform === option && { color: '#fff' }
+              ]}>
+                {option}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      )}
-
-      {/* Platform Selection */}
-      {consultant.platform && consultant.platform.length > 0 && (
-        <View style={styles.selectionContainer}>
-          <Text style={styles.label}>Select Platform</Text>
-          <View style={styles.optionsRow}>
-            {consultant.platform.map((option, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.optionButton,
-                  selectedPlatform === option && styles.optionButtonSelected,
-                ]}
-                onPress={() => setSelectedPlatform(option)}
-              >
-                <Text style={[
-                  styles.optionText,
-                  selectedPlatform === option && { color: '#fff' }
-                ]}>
-                  {option}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
+      </View>
 
       <TouchableOpacity 
-        style={styles.confirmButton} 
+        style={[
+          styles.confirmButton,
+          (!selectedConsultationHour || !selectedPlatform) && styles.disabledButton
+        ]} 
         onPress={handleMakeAppointment}
-        disabled={!selectedAvailableDay || !selectedConsultationHour || !selectedPlatform}
+        disabled={!selectedConsultationHour || !selectedPlatform}
       >
         <Text style={styles.confirmButtonText}>Confirm Appointment</Text>
       </TouchableOpacity>
@@ -319,6 +303,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   noAvailableText: {
     color: '#FF0000',

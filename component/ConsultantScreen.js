@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, FlatList, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { db } from '../firebaseConfig';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, startAfter, limit } from 'firebase/firestore';
+import { Image as ExpoImage } from 'expo-image';
 
 export default function ConsultantScreen({ navigation }) {
   const [consultants, setConsultants] = useState([]);
@@ -37,7 +38,12 @@ export default function ConsultantScreen({ navigation }) {
   const renderItem = ({ item }) => (
     <TouchableOpacity onPress={() => navigation.navigate('ConsultantDetail', { consultant: item })}>
       <View style={styles.card}>
-        <Image source={{ uri: item.photoUrl || 'default_image_url' }} style={styles.image} />
+        <ExpoImage
+          source={{ uri: item.photoUrl }}
+          style={styles.image}
+          contentFit="cover"
+          transition={1000}
+        />
         <View style={styles.info}>
           <Text style={styles.name}>{item.name || 'Unknown User'}</Text>
           <Text style={styles.specialty}>{item.specialty || 'No Specialty'}</Text>
@@ -46,6 +52,17 @@ export default function ConsultantScreen({ navigation }) {
       </View>
     </TouchableOpacity>
   );
+
+  const loadMore = async () => {
+    const last = consultants[consultants.length - 1];
+    const next = query(
+      collection(db, 'consultants'),
+      orderBy('name'),
+      startAfter(last.name),
+      limit(10)
+    );
+    // Fetch and update state
+  };
 
   return (
     <View style={styles.container}>

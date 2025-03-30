@@ -62,6 +62,7 @@ const ChatScreen = ({ route, navigation }) => {
           text: messages[0].text,
           user: messages[0].user,
           createdAt: serverTimestamp(),
+          status: 'sent',
         });
       } catch (error) {
         console.error("RN Send Error:", error);
@@ -114,6 +115,16 @@ const ChatScreen = ({ route, navigation }) => {
     );
   };
 
+  // Render status in Bubble
+  const renderCustomView = (props) => (
+    <View style={styles.statusContainer}>
+      <Text style={styles.statusText}>
+        {props.currentMessage.status === 'sent' && '✓'}
+        {props.currentMessage.status === 'delivered' && '✓✓'}
+      </Text>
+    </View>
+  );
+
   // Loading indicator
   if (isLoading) {
     return (
@@ -145,6 +156,7 @@ const ChatScreen = ({ route, navigation }) => {
           left: { color: '#666' },
         }}
         placeholder="Type your message here..."
+        renderCustomView={renderCustomView}
       />
     </SafeAreaView>
   );
@@ -217,6 +229,18 @@ const styles = StyleSheet.create({
   appointmentText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  statusContainer: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: '#FFFFFF',
+    padding: 2,
+    borderRadius: 10,
+  },
+  statusText: {
+    fontSize: 12,
     fontWeight: 'bold',
   },
 });

@@ -14,11 +14,24 @@ const RegisterScreen = ({ navigation }) => {
 
   const auth = getAuth(app); // Pass the app instance here
 
-  const handleRegister = async () => {
-    if (password !== confirmPassword) {
-      alert("Passwords don't match!");
-      return;
+  const validateForm = () => {
+    if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(email)) {
+      Alert.alert('Invalid Email');
+      return false;
     }
+    if (password.length < 8) {
+      Alert.alert('Password must be 8+ characters');
+      return false;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Passwords mismatch');
+      return false;
+    }
+    return true;
+  };
+
+  const handleRegister = async () => {
+    if (!validateForm()) return;
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);

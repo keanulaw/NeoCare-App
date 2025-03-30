@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { db, auth } from '../firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
@@ -32,6 +32,13 @@ const BookingsScreen = ({ navigation }) => {
         });
         
         setAppointments(appointmentsData);
+
+        appointmentsData.forEach(appt => {
+          Alert.alert(
+            'Appointment Reminder',
+            `Your appointment with ${appt.consultantName} is scheduled for ${appt.date.toLocaleString()}`
+          );
+        });
       } catch (error) {
         console.error("Error fetching appointments:", error);
       }
