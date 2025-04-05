@@ -4,6 +4,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { db, auth } from '../firebaseConfig';
 import { collection, addDoc, serverTimestamp, doc, getDoc, query, where, getDocs } from 'firebase/firestore';
 import moment from 'moment-timezone';
+import theme from '../src/theme';
+import commonStyles from '../src/commonStyles';
 
 const getNextAvailableDate = (availableDays) => {
   const phTime = moment().tz('Asia/Manila');
@@ -46,6 +48,7 @@ const AppointmentScreen = ({ route, navigation }) => {
         setBookedTimes(booked);
       } catch (error) {
         console.error("Error fetching booked times:", error);
+        Alert.alert("Error", `Error fetching booked times: ${error.message}`);
       }
     };
 
@@ -125,85 +128,86 @@ const AppointmentScreen = ({ route, navigation }) => {
 
   return (
     <ScrollView style={styles.container}>
-      <Image source={{ uri: consultant.photoUrl }} style={styles.image} />
-      <Text style={styles.name}>Dr. {consultant.name}</Text>
-      <Text style={styles.specialty}>{consultant.specialty}</Text>
+      <TouchableOpacity 
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <Text style={styles.backButtonText}>← Back</Text>
+      </TouchableOpacity>
+      <View style={styles.card}>
+        <Text style={styles.specialtyText}>Specialty Information</Text>
+        <Image source={{ uri: consultant.photoUrl }} style={styles.image} />
+        <Text style={styles.name}>Dr. {consultant.name}</Text>
+        <Text style={styles.specialty}>{consultant.specialty}</Text>
 
-      <View style={styles.pickerContainer}>
-        <Text style={styles.label}>
-          Select Date (Available: {consultant.availableDays.join(', ')})
-        </Text>
-        <TouchableOpacity 
-          style={styles.pickerButton} 
-          onPress={() => setShowDatePicker(true)}
-        >
-          <Text style={styles.pickerText}>
-            {moment(selectedDate).tz('Asia/Manila').format('LLLL')}
+        <View style={styles.pickerContainer}>
+          <Text style={styles.label}>
+            Select Date (Available: {consultant.availableDays.join(', ')})
           </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity 
+            style={styles.pickerButton} 
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={styles.pickerText}>
+              {moment(selectedDate).tz('Asia/Manila').format('LLLL')}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      {availableConsultationHours.length > 0 ? (
+        {availableConsultationHours.length > 0 ? (
+          <View style={styles.selectionContainer}>
+            <Text style={styles.label}>Available Times for {selectedAvailableDay}</Text>
+            <View style={styles.optionsRow}>
+              {availableConsultationHours.map((hour, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.optionButton,
+                    selectedConsultationHour === hour && styles.optionButtonSelected,
+                  ]}
+                  onPress={() => setSelectedConsultationHour(hour)}
+                >
+                  <Text style={[
+                    styles.optionText,
+                    selectedConsultationHour === hour && { color: '#fff' }
+                  ]}>
+                    {hour}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.noAvailableText}>
+            No available times for {selectedAvailableDay}
+          </Text>
+        )}
+
         <View style={styles.selectionContainer}>
-          <Text style={styles.label}>Available Times for {selectedAvailableDay}</Text>
+          <Text style={styles.label}>Select Platform</Text>
           <View style={styles.optionsRow}>
-            {availableConsultationHours.map((hour, index) => (
+            {consultant.platform.map((option, index) => (
               <TouchableOpacity
                 key={index}
                 style={[
                   styles.optionButton,
-                  selectedConsultationHour === hour && styles.optionButtonSelected,
+                  selectedPlatform === option && styles.optionButtonSelected,
                 ]}
-                onPress={() => setSelectedConsultationHour(hour)}
+                onPress={() => setSelectedPlatform(option)}
               >
                 <Text style={[
                   styles.optionText,
-                  selectedConsultationHour === hour && { color: '#fff' }
+                  selectedPlatform === option && { color: '#fff' }
                 ]}>
-                  {hour}
+                  {option}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
-      ) : (
-        <Text style={styles.noAvailableText}>
-          No available times for {selectedAvailableDay}
-        </Text>
-      )}
-
-      <View style={styles.selectionContainer}>
-        <Text style={styles.label}>Select Platform</Text>
-        <View style={styles.optionsRow}>
-          {consultant.platform.map((option, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.optionButton,
-                selectedPlatform === option && styles.optionButtonSelected,
-              ]}
-              onPress={() => setSelectedPlatform(option)}
-            >
-              <Text style={[
-                styles.optionText,
-                selectedPlatform === option && { color: '#fff' }
-              ]}>
-                {option}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
       </View>
-
-      <TouchableOpacity 
-        style={[
-          styles.confirmButton,
-          (!selectedConsultationHour || !selectedPlatform) && styles.disabledButton
-        ]} 
-        onPress={handleMakeAppointment}
-        disabled={!selectedConsultationHour || !selectedPlatform}
-      >
-        <Text style={styles.confirmButtonText}>Confirm Appointment</Text>
+      <TouchableOpacity style={styles.button} onPress={handleMakeAppointment}>
+        <Text style={commonStyles.buttonText}>Book Appointment</Text>
       </TouchableOpacity>
 
       {showDatePicker && (
@@ -221,9 +225,20 @@ const AppointmentScreen = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#FFF4E6',
-    padding: 20,
+    ...commonStyles.screenContainer,
+  },
+  card: {
+    ...commonStyles.card,
+    marginBottom: theme.spacing.md,
+  },
+  button: {
+    ...commonStyles.buttonPrimary,
+    marginTop: theme.spacing.md,
+  },
+  specialtyText: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.text.subheading,
+    marginBottom: theme.spacing.lg,
   },
   image: {
     width: 120,
@@ -291,27 +306,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  confirmButton: {
-    backgroundColor: '#D47FA6',
-    borderRadius: 10,
-    padding: 15,
-    marginTop: 20,
-    width: '100%',
-    alignItems: 'center',
-  },
-  confirmButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
   noAvailableText: {
     color: '#FF0000',
     fontSize: 14,
     marginTop: 5,
   },
+  backButton: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    padding: 10,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
 });
 
-export default AppointmentScreen; 
+export default AppointmentScreen;

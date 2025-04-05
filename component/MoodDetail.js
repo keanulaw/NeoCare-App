@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import theme from '../src/theme';
+import commonStyles from '../src/commonStyles';
 
 const feelings = [
   { emoji: '😊', label: 'Happy' },
@@ -31,6 +33,12 @@ const MoodDetail = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity 
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <Text style={styles.backButtonText}>← Back</Text>
+      </TouchableOpacity>
       <Text style={styles.title}>How are you feeling today?</Text>
       <Text style={styles.date}>{moodData.date}</Text>
 
@@ -70,78 +78,63 @@ const MoodDetail = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#FFF4E6',
-    padding: 20,
+    ...commonStyles.screenContainer,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#D47FA6',
+    ...commonStyles.headerText,
     textAlign: 'center',
-    marginTop: 20,
-    marginBottom: 10,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
   date: {
-    fontSize: 16,
-    color: '#A9A9A9',
+    fontSize: theme.text.body,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: theme.spacing.md,
   },
   emojiScroll: {
-    marginBottom: 20,
+    marginBottom: theme.spacing.md,
   },
   emojiButton: {
+    ...commonStyles.card,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 10,
-    marginHorizontal: 8,
     width: 80,
     height: 80,
-    elevation: 3,
   },
   selectedEmoji: {
-    backgroundColor: '#FF6F61',
+    backgroundColor: theme.colors.secondary,
   },
   emoji: {
     fontSize: 32,
-    marginBottom: 5,
+    marginBottom: theme.spacing.xs,
   },
   emojiLabel: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: '500',
+    fontSize: theme.text.caption,
+    color: theme.colors.textPrimary,
   },
   messageContainer: {
     flex: 1,
-    marginTop: -200,
-    marginBottom: 20,
+    marginBottom: theme.spacing.md,
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 15,
+    ...commonStyles.input,
     minHeight: 120,
     textAlignVertical: 'top',
-    fontSize: 16,
-    color: '#333',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
   saveButton: {
-    backgroundColor: '#FF6F61',
-    borderRadius: 15,
-    padding: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 3,
+    ...commonStyles.buttonPrimary,
   },
   saveText: {
-    color: '#fff',
+    ...commonStyles.buttonText,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 15,
+  },
+  backButtonText: {
+    color: theme.colors.primary,
     fontSize: 16,
-    fontWeight: 'bold',
   },
 });
 

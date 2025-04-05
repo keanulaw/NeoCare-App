@@ -1,23 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, SafeAreaView } from 'react-native';
 import { db, auth } from '../firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import theme from '../src/theme';
+import commonStyles from '../src/commonStyles';
 
 const BookingsScreen = ({ navigation }) => {
   const [appointments, setAppointments] = useState([]);
 
   useEffect(() => {
-    const fetchAcceptedAppointments = async () => {
+    const fetchAppointments = async () => {
       try {
         const user = auth.currentUser;
         if (!user) return;
 
+        // Include both accepted and pending appointments.
         const q = query(
           collection(db, 'appointmentRequests'),
           where('userId', '==', user.uid),
-          where('status', '==', 'accepted')
+          where('status', 'in', ['accepted', 'pending'])
         );
-        
+
         const querySnapshot = await getDocs(q);
         const appointmentsData = querySnapshot.docs.map(doc => {
           const data = doc.data();
@@ -33,10 +36,11 @@ const BookingsScreen = ({ navigation }) => {
         
         setAppointments(appointmentsData);
 
+        // Optional: Alert for each appointment.
         appointmentsData.forEach(appt => {
           Alert.alert(
             'Appointment Reminder',
-            `Your appointment with ${appt.consultantName} is scheduled for ${appt.date.toLocaleString()}`
+            `Your appointment with ${appt.consultantName} is scheduled for ${appt.date.toLocaleString()} (Status: ${appt.status})`
           );
         });
       } catch (error) {
@@ -44,80 +48,103 @@ const BookingsScreen = ({ navigation }) => {
       }
     };
 
-    fetchAcceptedAppointments();
+    fetchAppointments();
   }, []);
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.header}>Accepted Appointments</Text>
-      
-      {appointments.length === 0 ? (
-        <Text style={styles.noAppointments}>No accepted appointments found</Text>
-      ) : (
-        appointments.map((appointment) => (
-          <View key={appointment.id} style={styles.card}>
-            <Text style={styles.consultantName}>{appointment.consultantName}</Text>
-            <View style={styles.detailsRow}>
-              <Text style={styles.detailText}>Date: {appointment.date.toLocaleDateString()}</Text>
-              <Text style={styles.detailText}>Time: {appointment.time}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>My Appointments</Text>
+      </View>
+      <ScrollView contentContainerStyle={styles.container}>
+        {appointments.length === 0 ? (
+          <Text style={styles.noAppointmentsText}>No appointments found.</Text>
+        ) : (
+          appointments.map(appt => (
+            <View key={appt.id} style={styles.appointmentCard}>
+              <Text style={styles.appointmentTitle}>
+                Appointment with {appt.consultantName}
+              </Text>
+              <Text style={styles.appointmentDetails}>
+                Date: {appt.date.toLocaleString()}
+              </Text>
+              <Text style={styles.appointmentDetails}>
+                Time: {appt.time} | Platform: {appt.platform}
+              </Text>
+              <Text style={styles.appointmentStatus}>
+                Status: {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
+              </Text>
             </View>
-            <View style={styles.detailsRow}>
-              <Text style={styles.detailText}>Platform: {appointment.platform}</Text>
-              <Text style={[styles.status, styles.acceptedStatus]}>Status: {appointment.status}</Text>
-            </View>
-          </View>
-        ))
-      )}
-    </ScrollView>
+          ))
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#FFF4E6',
-    padding: 20,
+    backgroundColor: theme.colors.background || '#F5F5F5',
   },
   header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#D47FA6',
-    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary || '#D47FA6',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
   },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
+  backButton: {
+    paddingRight: 15,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  container: {
     padding: 15,
+  },
+  noAppointmentsText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 20,
+    color: theme.colors.textSecondary || '#666',
+  },
+  appointmentCard: {
+    ...commonStyles.card,
     marginBottom: 15,
+    padding: 15,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
     elevation: 3,
   },
-  consultantName: {
+  appointmentTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 10,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    fontWeight: 'bold',
+    color: theme.colors.textPrimary || '#333',
     marginBottom: 5,
   },
-  detailText: {
+  appointmentDetails: {
+    fontSize: 16,
+    color: theme.colors.textPrimary || '#333',
+    marginBottom: 3,
+  },
+  appointmentStatus: {
     fontSize: 14,
-    color: '#666',
-  },
-  status: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  acceptedStatus: {
-    color: '#4CAF50',
-  },
-  noAppointments: {
-    textAlign: 'center',
-    color: '#666',
-    marginTop: 20,
+    color: theme.colors.textSecondary || '#666',
+    marginTop: 5,
   },
 });
 
-export default BookingsScreen; 
+export default BookingsScreen;

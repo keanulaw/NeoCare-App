@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import { useNavigation } from '@react-navigation/native';
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyBcJDGxtpPyKTJaH8VsPdWq3RkohUNkfd4'; // Replace with your actual API key
 
@@ -18,6 +19,7 @@ const BirthingCenterLocator = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [birthingCenters, setBirthingCenters] = useState([]);
   const [loadingLocation, setLoadingLocation] = useState(true);
+  const navigation = useNavigation();
 
   // Get user's current location
   useEffect(() => {
@@ -125,6 +127,12 @@ const BirthingCenterLocator = () => {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity 
+        style={styles.backButton} 
+        onPress={() => navigation.goBack()}
+      >
+        <Text>← Back</Text>
+      </TouchableOpacity>
       {/* Optional: Still include autocomplete if you want manual search as well */}
       <GooglePlacesAutocomplete
         placeholder="Search"
@@ -242,6 +250,10 @@ const styles = StyleSheet.create({
   emptyList: {
     alignItems: 'center',
     marginTop: 20,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 15,
   },
 });
 

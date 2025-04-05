@@ -1,12 +1,11 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, Button, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, Alert, TouchableOpacity, ScrollView } from 'react-native';
 import { db, auth } from '../firebaseConfig'; // Use the already-initialized instance
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
-import { query, where, getDocs, setDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
+import { query, where } from 'firebase/firestore';
 
 const ConsultantDetailScreen = ({ route, navigation }) => {
   const { consultant } = route.params;
-
   console.log('Consultant:', consultant); // Log to verify consultant data
 
   // Ensure consultant has necessary fields
@@ -16,6 +15,7 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
   }
 
   const handleMakeAppointment = () => {
+    console.log("Make Appointment button pressed.");
     if (!auth.currentUser) {
       Alert.alert("Not Logged In", "Please log in to make an appointment.");
       return;
@@ -24,6 +24,7 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
   };
 
   const handleChatNavigation = async () => {
+    console.log("Chat with Consultant button pressed.");
     try {
       // Check if a chat already exists
       const participants = [auth.currentUser.uid, consultant.userId].sort();
@@ -49,6 +50,7 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
       navigation.navigate('Chat', { chatDetails: { chatId, consultant } });
     } catch (error) {
       console.error("Error navigating to chat:", error);
+      Alert.alert("Error", "Unable to navigate to chat. Please try again later.");
     }
   };
 
@@ -84,7 +86,9 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
         <Text style={styles.sectionContent}>Email: {consultant.email}</Text>
         <Text style={styles.sectionContent}>Phone: {consultant.contactInfo}</Text>
       </View>
-      <Button title="Make Appointment" onPress={handleMakeAppointment} style={styles.appointmentButton} />
+      <TouchableOpacity style={styles.appointmentButton} onPress={handleMakeAppointment}>
+        <Text style={styles.buttonText}>Make Appointment</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.chatButton} onPress={handleChatNavigation}>
         <Text style={styles.chatButtonText}>Chat with Consultant</Text>
       </TouchableOpacity>
@@ -149,8 +153,10 @@ const styles = StyleSheet.create({
   },
   appointmentButton: {
     margin: 20,
+    padding: 15,
     backgroundColor: '#6bc4c1',
-    color: '#fff',
+    borderRadius: 10,
+    alignItems: 'center',
   },
   chatButton: {
     margin: 20,
@@ -164,6 +170,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });
 
-export default ConsultantDetailScreen; 
+export default ConsultantDetailScreen;

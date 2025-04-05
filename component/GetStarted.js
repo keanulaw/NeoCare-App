@@ -3,6 +3,8 @@ import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ActivityIndicat
 import MoodPopup from './MoodPopUp';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAuth } from 'firebase/auth';
+import theme from '../src/theme';
+import commonStyles from '../src/commonStyles';
 
 export default function GetStarted({ navigation }) {
   const [showMoodPopup, setShowMoodPopup] = useState(false);
@@ -43,7 +45,7 @@ export default function GetStarted({ navigation }) {
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#D47FA6" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -55,7 +57,7 @@ export default function GetStarted({ navigation }) {
       <Text style={styles.subtitle}>TENDER CARE FOR TWO</Text>
 
       <TouchableOpacity style={styles.getStartedButton} onPress={handleGetStartedPress}>
-        <Text style={styles.buttonText}>GET STARTED</Text>
+        <Text style={styles.getStartedText}>Get Started</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.emergencyButton}>
@@ -80,10 +82,9 @@ export default function GetStarted({ navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#FFF4E6',
-    alignItems: 'center',
+    ...commonStyles.screenContainer,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   logo: {
     width: 150,
@@ -101,11 +102,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   getStartedButton: {
-    backgroundColor: '#F8BBD0',
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    marginBottom: 20,
+    ...commonStyles.buttonPrimary,
+  },
+  getStartedText: {
+    ...commonStyles.buttonText,
   },
   emergencyButton: {
     backgroundColor: '#FF6F61',

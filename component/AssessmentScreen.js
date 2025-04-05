@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { collection, getDocs, query, where, doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { getAuth } from 'firebase/auth';
+import theme from '../src/theme';
+import commonStyles from '../src/commonStyles';
 
 const moodEmojis = {
   Happy: '😊',
@@ -111,8 +113,14 @@ const AssessmentScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.backButton}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Mood Assessment</Text>
+      </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#D47FA6" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       ) : (
         <>
           <Calendar
@@ -176,32 +184,36 @@ const getMoodDescription = (avg) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#FFF4E6',
-    padding: 20,
+    ...commonStyles.screenContainer,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: theme.spacing.md,
+  },
+  backButton: {
+    color: theme.colors.primary,
+    fontSize: 16,
+  },
+  title: {
+    fontSize: theme.text.title,
+    color: theme.colors.textPrimary,
+    marginLeft: theme.spacing.md,
   },
   averageContainer: {
-    marginTop: 20,
+    marginTop: theme.spacing.md,
   },
   averageItem: {
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    ...commonStyles.card,
+    marginBottom: theme.spacing.sm,
   },
   averageText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: 'bold',
-    marginBottom: 5,
+    fontSize: theme.text.body,
+    color: theme.colors.textPrimary,
   },
   averageDescription: {
-    fontSize: 14,
-    color: '#fff',
+    fontSize: theme.text.caption,
+    color: theme.colors.textSecondary,
   },
 });
 

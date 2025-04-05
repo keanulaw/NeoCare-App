@@ -1,115 +1,152 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, Alert, Linking } from 'react-native';
-import { db } from '../firebaseConfig'; // Import Firestore
-import { collection, getDocs } from 'firebase/firestore';
-import CustomButton from '../component/Button';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, FlatList } from 'react-native';
+import { db, auth } from '../firebaseConfig';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 export default function Dashboard({ navigation }) {
-  const [data, setData] = useState([]);
-
-  const emergencyNumbers = {
-    ph: '+63123456789', // Philippines emergency number
-    hospital: '+63123456788'
-  };
-
-  const handleSOS = () => {
-    Alert.alert('Emergency Call', 'Choose service', [
-      { text: 'Police/Ambulance', onPress: () => Linking.openURL(`tel:${emergencyNumbers.ph}`) },
-      { text: 'Hospital', onPress: () => Linking.openURL(`tel:${emergencyNumbers.hospital}`) },
-      { text: 'Cancel', style: 'cancel' }
-    ]);
-  };
+  const [appointments, setAppointments] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    const fetchData = async () => {
-      const querySnapshot = await getDocs(collection(db, 'your-collection-name'));
-      const docs = querySnapshot.docs.map(doc => doc.data());
-      setData(docs);
-    };
+    const user = auth.currentUser;
+    if (!user) return;
 
-    fetchData();
+    const q = query(
+      collection(db, 'appointmentRequests'),
+      where('userId', '==', user.uid),
+      where('status', '==', 'confirmed')
+    );
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const appointmentsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        date: doc.data().date.toDate()
+      }));
+      setAppointments(appointmentsData);
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  const renderAppointment = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.appointmentCard}
+      onPress={() => navigation.navigate('AppointmentDetails', { appointment: item })}
+    >
+      <View style={styles.appointmentContent}>
+        <Text style={styles.appointmentDate}>
+          {new Date(item.date).toLocaleDateString('en-PH', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}
+        </Text>
+        <Text style={styles.appointmentTime}>
+          {new Date(item.date).toLocaleTimeString('en-PH', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })}
+        </Text>
+        <Text style={styles.appointmentDetails}>{item.consultantName}</Text>
+        <Text style={styles.appointmentPlatform}>{item.platform}</Text>
+      </View>
+      <Icon name="chevron-right" size={24} color="#D47FA6" />
+    </TouchableOpacity>
+  );
+
+  const quickAccessButtons = [
+    { id: '1', name: 'Consultants', icon: 'people', screen: 'ConsultantScreen' },
+    { id: '2', name: 'Birth Centers', icon: 'place', screen: 'BirthingCenterLocator' },
+    { id: '3', name: 'Assessment', icon: 'assessment', screen: 'Assessment' },
+    { id: '4', name: 'Tracker', icon: 'track-changes', screen: 'Tracker' },
+    { id: '5', name: 'Bookings', icon: 'book-online', screen: 'Bookings' },
+    { id: '6', name: 'Chat Bot', icon: 'chat', screen: 'ChatBot' },
+  ];
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Image source={require('../assets/logo.png')} style={styles.logo} />
-        <View>
-          <Text style={styles.greeting}>Hello</Text>
+        <View style={styles.userInfo}>
+          <Text style={styles.greeting}>Good {getTimeOfDay()},</Text>
           <Text style={styles.name}>Shannon</Text>
         </View>
-        <TouchableOpacity style={styles.notificationIcon}>
-          <Image source={require('../assets/notification-icon.png')} style={styles.icon} />
+        <TouchableOpacity 
+          style={styles.notificationIcon}
+          onPress={() => navigation.navigate('Notifications')}
+        >
+          <Icon name="notifications" size={28} color="#D47FA6" />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
-      <TextInput style={styles.searchBar} placeholder="Search" placeholderTextColor="#888" />
+      <View style={styles.searchContainer}>
+        <Icon name="search" size={20} color="#888" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search services or consultants"
+          placeholderTextColor="#888"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
 
-      {/* Quick Access Buttons */}
-      <View style={styles.buttonRow}>
-        <TouchableOpacity 
-          style={styles.circleButton}
-          onPress={() => navigation.navigate('ConsultantScreen')} // Navigate to ConsultantScreen
-        >
-          <Image source={require('../assets/consultants-icon.png')} style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Consultants</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.circleButton}
-          onPress={() => navigation.navigate('BirthingCenterLocator')} // Navigate to BirthingCenterLocator
-        >
-          <Image source={require('../assets/birth-centers-icon.png')} style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Birth Centers</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.circleButton} 
-          onPress={() => navigation.navigate('Assessment')}
-        >
-          <Image source={require('../assets/assessment-icon.png')} style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Assessment</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.circleButton}>
-          <Image source={require('../assets/tracker-icon.png')} style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Tracker</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.circleButton}>
-          <Image source={require('../assets/chat-bot-icon.png')} style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Chat Bot</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.circleButton}
-          onPress={() => navigation.navigate('Bookings')}
-        >
-          <Image source={require('../assets/booking-icon.png')} style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Bookings</Text>
-        </TouchableOpacity>
+      {/* Quick Access Grid */}
+      <View style={styles.gridContainer}>
+        {quickAccessButtons.map((button) => (
+          <TouchableOpacity
+            key={button.id}
+            style={styles.gridButton}
+            onPress={() => navigation.navigate(button.screen)}
+          >
+            <Icon name={button.icon} size={28} color="#D47FA6" />
+            <Text style={styles.gridButtonText}>{button.name}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Upcoming Appointments */}
-      <View style={styles.appointments}>
-        <View style={styles.appointmentsHeader}>
-          <Text style={styles.appointmentsTitle}>Upcoming Appointments</Text>
-          <TouchableOpacity>
-            <Text style={styles.viewAll}>View All</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.appointmentCard}>
-          <Text style={styles.appointmentDate}>June 15, 2024</Text>
-          <Text style={styles.appointmentDetails}>Glucose screening test:</Text>
-        </View>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Appointments')}>
+          <Text style={styles.viewAll}>View All</Text>
+        </TouchableOpacity>
       </View>
+      
+      {appointments.length > 0 ? (
+        <FlatList
+          data={appointments}
+          renderItem={renderAppointment}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.appointmentsList}
+        />
+      ) : (
+        <View style={styles.noAppointments}>
+          <Icon name="event-available" size={40} color="#D47FA6" />
+          <Text style={styles.noAppointmentsText}>No upcoming appointments</Text>
+        </View>
+      )}
 
-      {/* SOS Button */}
-      <CustomButton title="EMERGENCY SOS" onPress={handleSOS} />
-
-      {data.map((item, index) => (
-        <Text key={index}>{JSON.stringify(item)}</Text>
-      ))}
+      {/* Chat Bot Floating Button */}
+      <TouchableOpacity 
+        style={styles.chatBotButton}
+        onPress={() => navigation.navigate('ChatBot')}
+      >
+        <Icon name="chat" size={28} color="white" />
+      </TouchableOpacity>
     </View>
   );
 }
+
+const getTimeOfDay = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Morning';
+  if (hour < 18) return 'Afternoon';
+  return 'Evening';
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -119,17 +156,16 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
   },
-  logo: {
-    width: 50,
-    height: 50,
+  userInfo: {
+    flex: 1,
   },
   greeting: {
     fontSize: 18,
-    color: '#D47FA6',
+    color: '#666',
   },
   name: {
     fontSize: 24,
@@ -139,89 +175,114 @@ const styles = StyleSheet.create({
   notificationIcon: {
     padding: 10,
   },
-  icon: {
-    width: 24,
-    height: 24,
-  },
-  searchBar: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 15,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 25,
+    paddingHorizontal: 20,
     marginVertical: 10,
     elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    height: 50,
     fontSize: 16,
     color: '#333',
+    marginLeft: 10,
   },
-  buttonRow: {
+  gridContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginVertical: 15,
   },
-  circleButton: {
-    backgroundColor: '#fff',
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+  gridButton: {
+    width: '30%',
+    backgroundColor: 'white',
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
+    padding: 15,
+    marginVertical: 8,
+    elevation: 2,
   },
-  buttonIcon: {
-    width: 24,
-    height: 24,
-    marginBottom: 5,
-  },
-  buttonText: {
-    fontSize: 10,
+  gridButtonText: {
+    fontSize: 12,
     color: '#D47FA6',
     textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '500',
   },
-  appointments: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    elevation: 3,
-  },
-  appointmentsHeader: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginVertical: 15,
   },
-  appointmentsTitle: {
-    fontSize: 18,
+  sectionTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#D47FA6',
   },
   viewAll: {
     color: '#FF6F61',
     fontSize: 14,
+    fontWeight: '500',
   },
   appointmentCard: {
-    backgroundColor: '#F8BBD0',
+    backgroundColor: 'white',
     borderRadius: 15,
-    padding: 15,
+    padding: 20,
+    marginVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    elevation: 2,
+  },
+  appointmentContent: {
+    flex: 1,
   },
   appointmentDate: {
     fontSize: 16,
-    fontWeight: 'bold',
     color: '#333',
+    fontWeight: '500',
+  },
+  appointmentTime: {
+    fontSize: 14,
+    color: '#666',
+    marginVertical: 4,
   },
   appointmentDetails: {
     fontSize: 14,
-    color: '#555',
+    color: '#D47FA6',
+    fontWeight: '500',
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 20,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    elevation: 3,
+  appointmentPlatform: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 4,
   },
-  footerIcon: {
-    width: 24,
-    height: 24,
+  noAppointments: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  noAppointmentsText: {
+    color: '#666',
+    marginTop: 10,
+    fontSize: 16,
+  },
+  chatBotButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    backgroundColor: '#D47FA6',
+    borderRadius: 30,
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
   },
 });

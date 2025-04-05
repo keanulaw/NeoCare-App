@@ -1,5 +1,5 @@
 import { TouchableOpacity, Text } from 'react-native';
-import theme from './theme';
+import theme from '../src/theme';
 
 export default function CustomButton({ title, onPress }) {
   return (

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Alert, Modal } from 'react-native';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import theme from '../src/theme';
 
 const feelings = [
   { emoji: '😊', label: 'Happy' },
@@ -21,7 +22,7 @@ export default function MoodPopup({ onSubmit, userId }) {
 
   useEffect(() => {
     const checkIfPopupShouldShow = async () => {
-      if (!userId) return; // Ensure userId is available
+      if (!userId) return;
 
       const lastShownDateKey = `lastMoodPopupDate_${userId}`;
       const lastShownDate = await AsyncStorage.getItem(lastShownDateKey);
@@ -50,7 +51,6 @@ export default function MoodPopup({ onSubmit, userId }) {
 
     try {
       await addDoc(collection(db, 'moods'), moodData);
-      Alert.alert('Mood data saved successfully!');
       onSubmit(moodData);
       const lastShownDateKey = `lastMoodPopupDate_${userId}`;
       await AsyncStorage.setItem(lastShownDateKey, new Date().toISOString().split('T')[0]);
@@ -60,84 +60,123 @@ export default function MoodPopup({ onSubmit, userId }) {
     }
   };
 
-  if (!showPopup) {
-    return null; // Don't render anything if the popup shouldn't be shown
-  }
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>How are you feeling today?</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {feelings.map((feeling) => (
-          <TouchableOpacity
-            key={feeling.label}
-            style={[styles.emojiButton, selectedFeeling === feeling.label && styles.selectedEmoji]}
-            onPress={() => setSelectedFeeling(feeling.label)}
+    <Modal
+      visible={showPopup}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowPopup(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.container}>
+          <Text style={styles.title}>How are you feeling today?</Text>
+
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.emojiScroll}
           >
-            <Text style={styles.emoji}>{feeling.emoji}</Text>
-            <Text style={styles.emojiLabel}>{feeling.label}</Text>
+            {feelings.map((feeling) => (
+              <TouchableOpacity
+                key={feeling.label}
+                style={[
+                  styles.emojiButton,
+                  selectedFeeling === feeling.label && styles.selectedEmoji
+                ]}
+                onPress={() => setSelectedFeeling(feeling.label)}
+              >
+                <Text style={styles.emoji}>{feeling.emoji}</Text>
+                <Text style={styles.emojiLabel}>{feeling.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Type your message here..."
+            placeholderTextColor={theme.colors.textSecondary}
+            value={message}
+            onChangeText={setMessage}
+            multiline
+            numberOfLines={4}
+          />
+
+          <TouchableOpacity 
+            style={styles.submitButton} 
+            onPress={handleSubmit}
+            disabled={!selectedFeeling}
+          >
+            <Text style={styles.submitText}>Submit</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-      <TextInput
-        style={styles.input}
-        placeholder="Type your message here..."
-        value={message}
-        onChangeText={setMessage}
-        multiline
-      />
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitText}>Submit</Text>
-      </TouchableOpacity>
-    </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
   container: {
-    padding: 20,
+    backgroundColor: theme.colors.background,
+    width: '90%',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
   },
   title: {
-    fontSize: 24,
+    fontSize: theme.text.heading,
+    color: theme.colors.primary,
     fontWeight: 'bold',
-    marginBottom: 20,
     textAlign: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  emojiScroll: {
+    paddingVertical: theme.spacing.sm,
   },
   emojiButton: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm,
+    marginHorizontal: theme.spacing.xs,
+    width: 80,
     alignItems: 'center',
-    marginHorizontal: 10,
-    padding: 10,
+    justifyContent: 'center',
   },
   selectedEmoji: {
-    backgroundColor: '#D47FA6',
-    borderRadius: 10,
+    backgroundColor: theme.colors.secondary,
   },
   emoji: {
-    fontSize: 40,
+    fontSize: 32,
+    marginBottom: theme.spacing.xs,
   },
   emojiLabel: {
-    fontSize: 12,
-    color: '#333',
-    marginTop: 5,
+    fontSize: theme.text.caption,
+    color: theme.colors.textPrimary,
+    textAlign: 'center',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 10,
-    padding: 15,
-    marginVertical: 20,
-    minHeight: 100,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginVertical: theme.spacing.md,
+    fontSize: theme.text.body,
+    color: theme.colors.textPrimary,
     textAlignVertical: 'top',
+    minHeight: 100,
   },
   submitButton: {
-    backgroundColor: '#D47FA6',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
     alignItems: 'center',
   },
   submitText: {
-    color: 'white',
+    color: theme.colors.surface,
+    fontSize: theme.text.body,
     fontWeight: 'bold',
-    fontSize: 16,
   },
 });

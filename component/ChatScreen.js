@@ -15,6 +15,8 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import Icon from 'react-native-vector-icons/Ionicons'; // Make sure to install this package
+import theme from '../src/theme';
+import commonStyles from '../src/commonStyles';
 
 const ChatScreen = ({ route, navigation }) => {
   const { chatDetails } = route.params;
@@ -125,47 +127,43 @@ const ChatScreen = ({ route, navigation }) => {
     </View>
   );
 
-  // Loading indicator
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#D47FA6" />
-      </View>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Make Appointment Button */}
-      <TouchableOpacity style={styles.appointmentButton} onPress={handleMakeAppointment}>
-        <Text style={styles.appointmentText}>Make Appointment</Text>
-      </TouchableOpacity>
+      {isLoading ? (
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      ) : (
+        <>
+          {/* Make Appointment Button */}
+          <TouchableOpacity style={styles.appointmentButton} onPress={handleMakeAppointment}>
+            <Text style={styles.appointmentText}>Make Appointment</Text>
+          </TouchableOpacity>
 
-      <GiftedChat
-        messages={messages}
-        onSend={(messages) => onSend(messages)}
-        user={{ _id: user?.uid }}
-        renderBubble={renderBubble}
-        renderSend={renderSend}
-        renderInputToolbar={renderInputToolbar}
-        alwaysShowSend
-        scrollToBottom
-        renderAvatar={null}
-        timeTextStyle={{
-          right: { color: '#FFF' },
-          left: { color: '#666' },
-        }}
-        placeholder="Type your message here..."
-        renderCustomView={renderCustomView}
-      />
+          <GiftedChat
+            messages={messages}
+            onSend={(messages) => onSend(messages)}
+            user={{ _id: user?.uid }}
+            renderBubble={renderBubble}
+            renderSend={renderSend}
+            renderInputToolbar={renderInputToolbar}
+            alwaysShowSend
+            scrollToBottom
+            renderAvatar={null}
+            timeTextStyle={{
+              right: { color: '#FFF' },
+              left: { color: '#666' },
+            }}
+            placeholder="Type your message here..."
+            renderCustomView={renderCustomView}
+          />
+        </>
+      )}
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#FFF4E6', // Light pink background
+    ...commonStyles.screenContainer,
   },
   loadingContainer: {
     flex: 1,
@@ -214,22 +212,10 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   appointmentButton: {
-    backgroundColor: '#D47FA6',
-    padding: 12,
-    margin: 10,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    ...commonStyles.buttonPrimary,
   },
   appointmentText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
+    ...commonStyles.buttonText,
   },
   statusContainer: {
     position: 'absolute',

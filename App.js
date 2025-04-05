@@ -20,6 +20,7 @@ import ConsultantDetailScreen from './component/ConsultantDetailScreen'; // Impo
 import ChatScreen from './component/ChatScreen'; // Import the ChatScreen
 import AppointmentScreen from './component/AppointmentScreen'; // Import the ChatScreen
 import BookingsScreen from './component/BookingsScreen'; // Adjust the path as necessary
+import Tracker from './component/Tracker'; // Import the Tracker component
 
 
 const Stack = createStackNavigator();
@@ -109,6 +110,11 @@ export default function App() {
           name="Bookings" 
           component={BookingsScreen} 
           options={{ title: 'My Bookings' }}
+        />
+        <Stack.Screen 
+          name="Tracker" 
+          component={Tracker} 
+          options={{ title: 'Pregnancy Tracker' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

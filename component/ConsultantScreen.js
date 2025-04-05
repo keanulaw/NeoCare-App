@@ -66,6 +66,12 @@ export default function ConsultantScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity 
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <Text>← Back to Dashboard</Text>
+      </TouchableOpacity>
       <TextInput
         style={styles.searchInput}
         placeholder="Search by name"
@@ -127,5 +133,9 @@ const styles = StyleSheet.create({
   rating: {
     fontSize: 14,
     color: '#FFD700',
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 15,
   },
 });
