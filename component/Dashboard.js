@@ -1,33 +1,55 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, Image, FlatList } from 'react-native';
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  SafeAreaView, 
+  ScrollView, 
+  FlatList, 
+  ActivityIndicator 
+} from 'react-native';
 import { db, auth } from '../firebaseConfig';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import theme from '../src/theme';
+import commonStyles from '../src/commonStyles';
 
-export default function Dashboard({ navigation }) {
+const Dashboard = ({ navigation }) => {
   const [appointments, setAppointments] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
+  // Fetch upcoming appointments (accepted or pending) for the current user
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const q = query(
-      collection(db, 'appointmentRequests'),
-      where('userId', '==', user.uid),
-      where('status', '==', 'confirmed')
-    );
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const appointmentsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date.toDate()
-      }));
-      setAppointments(appointmentsData);
-    });
-
-    return () => unsubscribe();
+    const fetchAppointments = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      const q = query(
+        collection(db, 'appointmentRequests'),
+        where('userId', '==', user.uid),
+        where('status', 'in', ['accepted', 'pending'])
+      );
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const appointmentsData = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            date: data.date ? data.date.toDate() : new Date(),
+            consultantName: data.consultantName,
+            time: data.consultationHour,
+            platform: data.platform,
+            status: data.status,
+          };
+        });
+        setAppointments(appointmentsData);
+        setLoading(false);
+      }, error => {
+        console.error("Error fetching appointments:", error);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    };
+    fetchAppointments();
   }, []);
 
   const renderAppointment = ({ item }) => (
@@ -37,7 +59,7 @@ export default function Dashboard({ navigation }) {
     >
       <View style={styles.appointmentContent}>
         <Text style={styles.appointmentDate}>
-          {new Date(item.date).toLocaleDateString('en-PH', { 
+          {item.date.toLocaleDateString('en-PH', { 
             weekday: 'long', 
             year: 'numeric', 
             month: 'long', 
@@ -45,101 +67,93 @@ export default function Dashboard({ navigation }) {
           })}
         </Text>
         <Text style={styles.appointmentTime}>
-          {new Date(item.date).toLocaleTimeString('en-PH', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })}
+          {item.date.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
         </Text>
-        <Text style={styles.appointmentDetails}>{item.consultantName}</Text>
+        <Text style={styles.appointmentDetails}>With Dr. {item.consultantName}</Text>
         <Text style={styles.appointmentPlatform}>{item.platform}</Text>
       </View>
       <Icon name="chevron-right" size={24} color="#D47FA6" />
     </TouchableOpacity>
   );
 
+  // Quick access buttons (Chat Bot removed from the grid since we have a floating button)
   const quickAccessButtons = [
     { id: '1', name: 'Consultants', icon: 'people', screen: 'ConsultantScreen' },
     { id: '2', name: 'Birth Centers', icon: 'place', screen: 'BirthingCenterLocator' },
     { id: '3', name: 'Assessment', icon: 'assessment', screen: 'Assessment' },
     { id: '4', name: 'Tracker', icon: 'track-changes', screen: 'Tracker' },
     { id: '5', name: 'Bookings', icon: 'book-online', screen: 'Bookings' },
-    { id: '6', name: 'Chat Bot', icon: 'chat', screen: 'ChatBot' },
   ];
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.userInfo}>
-          <Text style={styles.greeting}>Good {getTimeOfDay()},</Text>
-          <Text style={styles.name}>Shannon</Text>
-        </View>
-        <TouchableOpacity 
-          style={styles.notificationIcon}
-          onPress={() => navigation.navigate('Notifications')}
-        >
-          <Icon name="notifications" size={28} color="#D47FA6" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Icon name="search" size={20} color="#888" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search services or consultants"
-          placeholderTextColor="#888"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
-      {/* Quick Access Grid */}
-      <View style={styles.gridContainer}>
-        {quickAccessButtons.map((button) => (
-          <TouchableOpacity
-            key={button.id}
-            style={styles.gridButton}
-            onPress={() => navigation.navigate(button.screen)}
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.userInfo}>
+            <Text style={styles.greeting}>Good {getTimeOfDay()},</Text>
+            <Text style={styles.name}>
+              {auth.currentUser ? auth.currentUser.displayName || "User" : "User"}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.notificationIcon}
+            onPress={() => navigation.navigate('Notifications')}
           >
-            <Icon name={button.icon} size={28} color="#D47FA6" />
-            <Text style={styles.gridButtonText}>{button.name}</Text>
+            <Icon name="notifications" size={28} color="#D47FA6" />
           </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Upcoming Appointments */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Appointments')}>
-          <Text style={styles.viewAll}>View All</Text>
-        </TouchableOpacity>
-      </View>
-      
-      {appointments.length > 0 ? (
-        <FlatList
-          data={appointments}
-          renderItem={renderAppointment}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.appointmentsList}
-        />
-      ) : (
-        <View style={styles.noAppointments}>
-          <Icon name="event-available" size={40} color="#D47FA6" />
-          <Text style={styles.noAppointmentsText}>No upcoming appointments</Text>
         </View>
-      )}
 
-      {/* Chat Bot Floating Button */}
+        {/* Quick Access Grid */}
+        <View style={styles.gridContainer}>
+          {quickAccessButtons.map((button) => (
+            <TouchableOpacity
+              key={button.id}
+              style={styles.gridButton}
+              onPress={() => navigation.navigate(button.screen)}
+            >
+              <Icon name={button.icon} size={28} color="#D47FA6" />
+              <Text style={styles.gridButtonText}>{button.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Upcoming Appointments Header */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Bookings')}>
+            <Text style={styles.viewAll}>View All</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Appointments List or Loading/Error */}
+        {loading ? (
+          <ActivityIndicator size="large" color={theme.colors.primary || '#D47FA6'} />
+        ) : appointments.length > 0 ? (
+          <FlatList
+            data={appointments}
+            renderItem={renderAppointment}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.appointmentsList}
+            scrollEnabled={false}
+          />
+        ) : (
+          <View style={styles.noAppointments}>
+            <Icon name="event-available" size={40} color="#D47FA6" />
+            <Text style={styles.noAppointmentsText}>No upcoming appointments</Text>
+          </View>
+        )}
+      </ScrollView>
+      {/* Floating Chat Bot Button at Bottom Center */}
       <TouchableOpacity 
         style={styles.chatBotButton}
         onPress={() => navigation.navigate('ChatBot')}
       >
         <Icon name="chat" size={28} color="white" />
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
-}
+};
 
 const getTimeOfDay = () => {
   const hour = new Date().getHours();
@@ -149,10 +163,13 @@ const getTimeOfDay = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#FFF4E6',
-    padding: 20,
+    backgroundColor: theme.colors.background || '#F5F5F5',
+  },
+  container: {
+    padding: 15,
+    paddingBottom: 80, // extra bottom padding so content doesn't hide behind the chat button
   },
   header: {
     flexDirection: 'row',
@@ -174,22 +191,6 @@ const styles = StyleSheet.create({
   },
   notificationIcon: {
     padding: 10,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 25,
-    paddingHorizontal: 20,
-    marginVertical: 10,
-    elevation: 2,
-  },
-  searchInput: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 10,
   },
   gridContainer: {
     flexDirection: 'row',
@@ -229,6 +230,9 @@ const styles = StyleSheet.create({
     color: '#FF6F61',
     fontSize: 14,
     fontWeight: '500',
+  },
+  appointmentsList: {
+    paddingBottom: 20,
   },
   appointmentCard: {
     backgroundColor: 'white',
@@ -275,8 +279,8 @@ const styles = StyleSheet.create({
   },
   chatBotButton: {
     position: 'absolute',
-    bottom: 30,
-    right: 30,
+    bottom: 20,
+    alignSelf: 'center',
     backgroundColor: '#D47FA6',
     borderRadius: 30,
     width: 60,
@@ -286,3 +290,5 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 });
+
+export default Dashboard;

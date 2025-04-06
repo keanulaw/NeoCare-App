@@ -1,3 +1,4 @@
+import 'react-native-reanimated';
 import 'react-native-get-random-values';
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -21,6 +22,7 @@ import ChatScreen from './component/ChatScreen'; // Import the ChatScreen
 import AppointmentScreen from './component/AppointmentScreen'; // Import the ChatScreen
 import BookingsScreen from './component/BookingsScreen'; // Adjust the path as necessary
 import Tracker from './component/Tracker'; // Import the Tracker component
+import ChatBotScreen from './component/ChatBotScreen';
 
 
 const Stack = createStackNavigator();
@@ -116,6 +118,7 @@ export default function App() {
           component={Tracker} 
           options={{ title: 'Pregnancy Tracker' }}
         />
+        <Stack.Screen name="ChatBot" component={ChatBotScreen} options={{ title: 'Chat Bot' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -54,44 +54,69 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  // Helper function to format array fields for display
+  const formatArray = (arr) => Array.isArray(arr) ? arr.join(', ') : arr;
+
   return (
     <ScrollView style={styles.container}>
-      <Image source={{ uri: consultant.photoUrl }} style={styles.image} />
-      <View style={styles.header}>
+      {/* Profile Section */}
+      <View style={styles.profileContainer}>
+        <Image 
+          source={{ uri: consultant.photoUrl || 'https://via.placeholder.com/150' }} 
+          style={styles.profileImage} 
+        />
         <Text style={styles.name}>Dr. {consultant.name}</Text>
         <Text style={styles.specialty}>{consultant.specialty}</Text>
-        <Text style={styles.sessionPrice}>₱500/session</Text>
       </View>
-      <View style={styles.ratingContainer}>
-        <Text style={styles.rating}>⭐ {consultant.rating || '5.0'}</Text>
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About Doctor {consultant.name}</Text>
+
+      {/* About Section */}
+      <View style={styles.detailCard}>
+        <Text style={styles.sectionTitle}>About Dr. {consultant.name}</Text>
         <Text style={styles.sectionContent}>
-          Doctor {consultant.name}, the son of a prominent local physician, recently graduated from the University of California, San Francisco School of Medicine with high honors. Read More
+          Dr. {consultant.name} specializes in {consultant.specialty} and is dedicated to providing top-notch care. Registered on NeoCare, they offer both in-person and online consultations.
         </Text>
       </View>
-      <View style={styles.section}>
+
+      {/* Location Section */}
+      <View style={styles.detailCard}>
         <Text style={styles.sectionTitle}>Location</Text>
         <Text style={styles.sectionContent}>{consultant.hospitalAddress}</Text>
       </View>
-      <View style={styles.section}>
+
+      {/* Appointment Details Section */}
+      <View style={styles.detailCard}>
         <Text style={styles.sectionTitle}>Appointment Details</Text>
-        <Text style={styles.sectionContent}>Available Days: {consultant.availableDays}</Text>
-        <Text style={styles.sectionContent}>Consultation Hours: {consultant.consultationHours}</Text>
-        <Text style={styles.sectionContent}>Platform: {consultant.platform}</Text>
+        <Text style={styles.sectionContent}>
+          <Text style={styles.detailLabel}>Available Days:</Text> {formatArray(consultant.availableDays)}
+        </Text>
+        <Text style={styles.sectionContent}>
+          <Text style={styles.detailLabel}>Consultation Hours:</Text> {formatArray(consultant.consultationHours)}
+        </Text>
+        <Text style={styles.sectionContent}>
+          <Text style={styles.detailLabel}>Platform:</Text> {formatArray(consultant.platform)}
+        </Text>
       </View>
-      <View style={styles.section}>
+
+      {/* Contact Information Section */}
+      <View style={styles.detailCard}>
         <Text style={styles.sectionTitle}>Contact Information</Text>
-        <Text style={styles.sectionContent}>Email: {consultant.email}</Text>
-        <Text style={styles.sectionContent}>Phone: {consultant.contactInfo}</Text>
+        <Text style={styles.sectionContent}>
+          <Text style={styles.detailLabel}>Email:</Text> {consultant.email}
+        </Text>
+        <Text style={styles.sectionContent}>
+          <Text style={styles.detailLabel}>Phone:</Text> {consultant.contactInfo}
+        </Text>
       </View>
-      <TouchableOpacity style={styles.appointmentButton} onPress={handleMakeAppointment}>
-        <Text style={styles.buttonText}>Make Appointment</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.chatButton} onPress={handleChatNavigation}>
-        <Text style={styles.chatButtonText}>Chat with Consultant</Text>
-      </TouchableOpacity>
+
+      {/* Action Buttons */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.appointmentButton} onPress={handleMakeAppointment}>
+          <Text style={styles.buttonText}>Make Appointment</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.chatButton} onPress={handleChatNavigation}>
+          <Text style={styles.buttonText}>Chat with Consultant</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };
@@ -174,6 +199,40 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  profileContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+    marginBottom: 10,
+  },
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 10,
+  },
+  detailCard: {
+    backgroundColor: '#fff',
+    padding: 20,
+    marginHorizontal: 15,
+    marginVertical: 8,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  detailLabel: {
+    fontWeight: 'bold',
+    color: '#555',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 20,
   },
 });
 
