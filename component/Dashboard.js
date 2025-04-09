@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   },
   chatBotButton: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 80,
     alignSelf: 'center',
     backgroundColor: '#D47FA6',
     borderRadius: 30,
@@ -287,7 +287,8 @@ const styles = StyleSheet.create({
     height: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 5,
+    elevation: 15,
+    zIndex: 999,
   },
 });
 

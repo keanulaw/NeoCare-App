@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, Image, SafeAreaView, ScrollView } from 'react-native';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, query, orderBy, startAfter, limit } from 'firebase/firestore';
 import { Image as ExpoImage } from 'expo-image';
+import CustomHeader from './CustomHeader'; // Import the CustomHeader
+import theme from '../src/theme'; // Import your theme
 
 export default function ConsultantScreen({ navigation }) {
   const [consultants, setConsultants] = useState([]);
@@ -65,33 +67,31 @@ export default function ConsultantScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text>← Back to Dashboard</Text>
-      </TouchableOpacity>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search by name"
-        value={search}
-        onChangeText={setSearch}
-      />
-      <FlatList
-        data={filteredConsultants}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => item.id || index.toString()}
-      />
-    </View>
+    <SafeAreaView style={styles.container}>
+      <CustomHeader title="Consultants" navigation={navigation} />
+      <ScrollView>
+        <View style={styles.container}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by name"
+            value={search}
+            onChangeText={setSearch}
+          />
+          <FlatList
+            data={filteredConsultants}
+            renderItem={renderItem}
+            keyExtractor={(item, index) => item.id || index.toString()}
+          />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 10,
-    backgroundColor: '#FFF4E6',
+    backgroundColor: theme.colors.background || '#F5F5F5',
   },
   searchInput: {
     borderBottomWidth: 1,
@@ -133,9 +133,5 @@ const styles = StyleSheet.create({
   rating: {
     fontSize: 14,
     color: '#FFD700',
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    marginBottom: 15,
   },
 });

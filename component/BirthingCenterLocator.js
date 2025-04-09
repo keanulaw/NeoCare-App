@@ -8,18 +8,19 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  SafeAreaView,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import { useNavigation } from '@react-navigation/native';
+import CustomHeader from './CustomHeader'; // Import the CustomHeader
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyBcJDGxtpPyKTJaH8VsPdWq3RkohUNkfd4'; // Replace with your actual API key
 
-const BirthingCenterLocator = () => {
+const BirthingCenterLocator = ({ navigation }) => {
   const [userLocation, setUserLocation] = useState(null);
   const [birthingCenters, setBirthingCenters] = useState([]);
   const [loadingLocation, setLoadingLocation] = useState(true);
-  const navigation = useNavigation();
 
   // Get user's current location
   useEffect(() => {
@@ -126,14 +127,8 @@ const BirthingCenterLocator = () => {
   }
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.backButton} 
-        onPress={() => navigation.goBack()}
-      >
-        <Text>← Back</Text>
-      </TouchableOpacity>
-      {/* Optional: Still include autocomplete if you want manual search as well */}
+    <SafeAreaView style={styles.container}>
+      <CustomHeader title="Birthing Center Locator" navigation={navigation} />
       <GooglePlacesAutocomplete
         placeholder="Search"
         fetchDetails={true}
@@ -182,7 +177,7 @@ const BirthingCenterLocator = () => {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -190,7 +185,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFF4E6',
-    padding: 20,
   },
   loadingContainer: {
     justifyContent: 'center',
@@ -250,10 +244,6 @@ const styles = StyleSheet.create({
   emptyList: {
     alignItems: 'center',
     marginTop: 20,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    marginBottom: 15,
   },
 });
 

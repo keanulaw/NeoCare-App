@@ -64,6 +64,10 @@ export default function GetStarted({ navigation }) {
         <Text style={styles.buttonText}>EMERGENCY BUTTON</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity style={styles.chatbotButton} onPress={() => navigation.navigate('ChatBot')}>
+        <Text style={styles.chatbotButtonText}>Chat with Bot</Text>
+      </TouchableOpacity>
+
       <Modal
         visible={showMoodPopup}
         transparent={true}
@@ -85,37 +89,64 @@ const styles = StyleSheet.create({
     ...commonStyles.screenContainer,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
   },
   logo: {
     width: 150,
     height: 150,
     marginBottom: 20,
+    resizeMode: 'contain',
   },
   title: {
-    fontSize: 32,
+    fontSize: 36,
     color: '#D47FA6',
     fontWeight: 'bold',
+    marginBottom: 10,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#A9A9A9',
     marginBottom: 40,
   },
   getStartedButton: {
-    ...commonStyles.buttonPrimary,
+    backgroundColor: theme.colors.primary || '#D47FA6',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    marginBottom: 20,
+    elevation: 5,
   },
   getStartedText: {
-    ...commonStyles.buttonText,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   emergencyButton: {
     backgroundColor: '#FF6F61',
     paddingVertical: 15,
     paddingHorizontal: 40,
     borderRadius: 30,
+    marginBottom: 20,
+    elevation: 5,
   },
   buttonText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
+    fontSize: 16,
+  },
+  chatbotButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    marginBottom: 20,
+    elevation: 5,
+  },
+  chatbotButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   modalOverlay: {
     flex: 1,

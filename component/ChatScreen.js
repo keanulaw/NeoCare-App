@@ -17,6 +17,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons'; // Make sure to install this package
 import theme from '../src/theme';
 import commonStyles from '../src/commonStyles';
+import CustomHeader from './CustomHeader'; // Import the CustomHeader
 
 const ChatScreen = ({ route, navigation }) => {
   const { chatDetails } = route.params;
@@ -129,6 +130,7 @@ const ChatScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <CustomHeader title="Chat" navigation={navigation} />
       {isLoading ? (
         <ActivityIndicator size="large" color={theme.colors.primary} />
       ) : (
@@ -163,7 +165,8 @@ const ChatScreen = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    ...commonStyles.screenContainer,
+    flex: 1,
+    backgroundColor: '#FFF4E6',
   },
   loadingContainer: {
     flex: 1,

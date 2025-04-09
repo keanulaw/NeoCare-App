@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView, SafeAreaView } from 'react-native';
 import { db, auth } from '../firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import theme from '../src/theme';
-import commonStyles from '../src/commonStyles';
+import CustomHeader from './CustomHeader';
 
 const Tracker = ({ navigation }) => {
   const [notes, setNotes] = useState([]);
@@ -15,7 +15,7 @@ const Tracker = ({ navigation }) => {
         const user = auth.currentUser;
         if (!user) return;
 
-        // 1. Get client document ID from clients collection
+        // Get the client document for the current user
         const clientsQuery = query(
           collection(db, "clients"),
           where("userId", "==", user.uid)
@@ -33,7 +33,7 @@ const Tracker = ({ navigation }) => {
         const clientDoc = clientSnapshot.docs[0];
         const clientId = clientDoc.id;
 
-        // 2. Query notes using client document ID
+        // Query consultation notes for the client
         const notesQuery = query(
           collection(db, "consultationNotes"),
           where("clientId", "==", clientId)
@@ -57,139 +57,121 @@ const Tracker = ({ navigation }) => {
     fetchNotes();
   }, []);
 
+  // Render each note as a simplified summary card
   const renderNoteItem = ({ item }) => (
-    <View style={commonStyles.card}>
-      {/* Maternal Health Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Maternal Health</Text>
-        <View style={styles.grid}>
-          <DetailItem label="Blood Pressure" value={item.maternalHealth.bloodPressure} />
-          <DetailItem label="Weight Gain" value={item.maternalHealth.weightGain} unit="kg" />
-          <DetailItem label="Hemoglobin" value={item.maternalHealth.hemoglobin} unit="g/dL" />
-          <DetailItem label="Uterine Height" value={item.maternalHealth.uterineHeight} unit="cm" />
-          <DetailItem label="Urine Analysis" value={item.maternalHealth.urineAnalysis} />
-          <DetailItem label="Symptoms" value={item.maternalHealth.symptoms} />
-        </View>
-      </View>
-
-      {/* Fetal Health Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Fetal Health</Text>
-        <View style={styles.grid}>
-          <DetailItem label="Heart Rate" value={item.fetalHealth.heartRate} unit="bpm" />
-          <DetailItem label="Movements" value={item.fetalHealth.movementFrequency} />
-          <DetailItem label="Presentation" value={item.fetalHealth.presentation} />
-          <DetailItem label="Gestational Age" value={item.fetalHealth.gestationalAge} />
-          <DetailItem label="Amniotic Fluid" value={item.fetalHealth.amnioticFluid} />
-          <DetailItem label="Ultrasound" value={item.fetalHealth.ultrasoundFindings} />
-        </View>
-      </View>
-
-      {/* Assessment & Recommendations */}
-      <View style={styles.section}>
-        <DetailItem label="Assessment" value={item.assessment} fullWidth />
-        <DetailItem label="Recommendations" value={item.recommendations} fullWidth />
-      </View>
-
+    <View style={styles.card}>
       <Text style={styles.dateText}>
         Recorded on {item.createdAt.toLocaleDateString()}
       </Text>
+      <View style={styles.noteContent}>
+        <Text style={styles.headerText}>Maternal Health</Text>
+        <Text style={styles.metricText}>
+          • Blood Pressure: {item.maternalHealth?.bloodPressure || 'N/A'}
+        </Text>
+        <Text style={styles.metricText}>
+          • Weight Gain: {item.maternalHealth?.weightGain ? `${item.maternalHealth.weightGain} kg` : 'N/A'}
+        </Text>
+        <Text style={styles.headerText}>Fetal Health</Text>
+        <Text style={styles.metricText}>
+          • Heart Rate: {item.fetalHealth?.heartRate ? `${item.fetalHealth.heartRate} bpm` : 'N/A'}
+        </Text>
+        <Text style={styles.metricText}>
+          • Movements: {item.fetalHealth?.movementFrequency || 'N/A'}
+        </Text>
+        {item.assessment && (
+          <Text style={styles.assessmentText}>
+            Assessment: {item.assessment}
+          </Text>
+        )}
+      </View>
     </View>
   );
 
   if (loading) {
     return (
-      <View style={commonStyles.screenContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary || '#D47FA6'} />
       </View>
     );
   }
 
   return (
-    <ScrollView style={commonStyles.screenContainer}>
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={commonStyles.headerText}>Pregnancy Tracker</Text>
-      
-      {notes.length === 0 ? (
-        <Text style={styles.emptyText}>No consultation notes found</Text>
-      ) : (
-        <FlatList
-          data={notes}
-          renderItem={renderNoteItem}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          contentContainerStyle={styles.listContainer}
-        />
-      )}
-    </ScrollView>
+    <SafeAreaView style={styles.container}>
+      <CustomHeader title="Pregnancy Tracker" navigation={navigation} />
+      <ScrollView contentContainerStyle={styles.contentContainer}>
+        {notes.length === 0 ? (
+          <Text style={styles.emptyText}>No consultation notes found</Text>
+        ) : (
+          <FlatList
+            data={notes}
+            renderItem={renderNoteItem}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+            contentContainerStyle={styles.listContainer}
+          />
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
-const DetailItem = ({ label, value, unit, fullWidth }) => (
-  <View style={[styles.detailItem, fullWidth && styles.fullWidth]}>
-    <Text style={styles.labelText}>{label}:</Text>
-    <Text style={styles.valueText}>
-      {value || 'N/A'} {unit && value && unit}
-    </Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
-  section: {
-    marginBottom: theme.spacing.md,
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background || '#F5F5F5',
   },
-  sectionTitle: {
-    fontSize: theme.text.subheading,
-    color: theme.colors.primary,
-    fontWeight: '600',
-    marginBottom: theme.spacing.sm,
+  contentContainer: {
+    padding: 15,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  detailItem: {
-    width: '48%',
-    marginBottom: theme.spacing.sm,
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  labelText: {
-    fontSize: theme.text.caption,
-    color: theme.colors.textSecondary,
-  },
-  valueText: {
-    fontSize: theme.text.body,
-    color: theme.colors.textPrimary,
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
   },
   dateText: {
-    fontSize: theme.text.caption,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.sm,
+    fontSize: 12,
+    color: theme.colors.textSecondary || '#666',
     textAlign: 'right',
+    marginBottom: 8,
+  },
+  noteContent: {
+    marginVertical: 5,
+  },
+  headerText: {
+    fontSize: 16,
+    color: theme.colors.primary || '#D47FA6',
+    fontWeight: '600',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  metricText: {
+    fontSize: 16,
+    color: theme.colors.textPrimary || '#333',
+    marginBottom: 3,
+  },
+  assessmentText: {
+    fontSize: 14,
+    color: theme.colors.primary || '#D47FA6',
+    fontWeight: '500',
+    marginTop: 8,
   },
   emptyText: {
     textAlign: 'center',
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.lg,
+    color: theme.colors.textSecondary || '#666',
+    marginTop: 20,
   },
   listContainer: {
-    paddingBottom: theme.spacing.xl,
-  },
-  backButton: {
-    padding: 10,
-    marginBottom: 10,
-  },
-  backButtonText: {
-    color: theme.colors.primary,
-    fontSize: 16,
+    paddingBottom: 20,
   },
 });
 

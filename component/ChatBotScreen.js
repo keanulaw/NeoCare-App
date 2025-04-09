@@ -4,8 +4,9 @@ import { GiftedChat, Bubble, Send } from 'react-native-gifted-chat';
 import Icon from 'react-native-vector-icons/Ionicons';
 import theme from '../src/theme';           // Your theme file (if available)
 import commonStyles from '../src/commonStyles'; // Your commonStyles file (if available)
+import CustomHeader from './CustomHeader'; // Import the CustomHeader
 
-const ChatBotScreen = () => {
+const ChatBotScreen = ({ navigation }) => {
   const [messages, setMessages] = useState([]);
   const [isLoadingResponse, setIsLoadingResponse] = useState(false);
 
@@ -28,7 +29,7 @@ const ChatBotScreen = () => {
     setIsLoadingResponse(true);
 
     try {
-      const response = await fetch('http://192.168.1.15:3000/chatbot', {
+      const response = await fetch('http://192.168.1.11:3000/chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symptoms: userMessage })
@@ -89,6 +90,7 @@ const ChatBotScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <CustomHeader title="Chat Bot" navigation={navigation} />
       <GiftedChat
         messages={messages}
         onSend={messages => onSend(messages)}

@@ -4,6 +4,7 @@ import { db, auth } from '../firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import theme from '../src/theme';
 import commonStyles from '../src/commonStyles';
+import CustomHeader from './CustomHeader';
 
 const BookingsScreen = ({ navigation }) => {
   const [appointments, setAppointments] = useState([]);
@@ -53,12 +54,7 @@ const BookingsScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Appointments</Text>
-      </View>
+      <CustomHeader title="My Appointments" navigation={navigation} />
       <ScrollView contentContainerStyle={styles.container}>
         {appointments.length === 0 ? (
           <Text style={styles.noAppointmentsText}>No appointments found.</Text>
@@ -89,25 +85,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background || '#F5F5F5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary || '#D47FA6',
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-  },
-  backButton: {
-    paddingRight: 15,
-  },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#fff',
   },
   container: {
     padding: 15,

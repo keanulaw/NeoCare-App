@@ -1,9 +1,18 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  ScrollView, 
+  SafeAreaView 
+} from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import theme from '../src/theme';
 import commonStyles from '../src/commonStyles';
+import CustomHeader from './CustomHeader';
 
 const feelings = [
   { emoji: '😊', label: 'Happy' },
@@ -32,75 +41,77 @@ const MoodDetail = ({ route, navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>How are you feeling today?</Text>
-      <Text style={styles.date}>{moodData.date}</Text>
+    <SafeAreaView style={commonStyles.screenContainer}>
+      <CustomHeader title="Mood Detail" navigation={navigation} />
+      <ScrollView contentContainerStyle={styles.contentContainer}>
+        <Text style={styles.title}>How are you feeling today?</Text>
+        
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={styles.emojiScroll}
+          contentContainerStyle={styles.emojiContentContainer}
+        >
+          {feelings.map((feeling) => (
+            <TouchableOpacity
+              key={feeling.label}
+              style={[
+                styles.emojiButton,
+                selectedFeeling === feeling.label && styles.selectedEmoji,
+              ]}
+              onPress={() => setSelectedFeeling(feeling.label)}
+            >
+              <Text style={styles.emoji}>{feeling.emoji}</Text>
+              <Text style={styles.emojiLabel}>{feeling.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.emojiScroll}>
-        {feelings.map((feeling) => (
-          <TouchableOpacity
-            key={feeling.label}
-            style={[
-              styles.emojiButton,
-              selectedFeeling === feeling.label && styles.selectedEmoji,
-            ]}
-            onPress={() => setSelectedFeeling(feeling.label)}
-          >
-            <Text style={styles.emoji}>{feeling.emoji}</Text>
-            <Text style={styles.emojiLabel}>{feeling.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <View style={styles.messageContainer}>
         <TextInput
           style={styles.input}
+          placeholder="Share your thoughts..."
           value={message}
           onChangeText={setMessage}
           multiline
-          placeholder="Edit your message..."
-          placeholderTextColor="#999"
         />
-      </View>
 
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveText}>Save</Text>
-      </TouchableOpacity>
-    </View>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <Text style={styles.saveText}>Save Mood</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    ...commonStyles.screenContainer,
+  contentContainer: {
+    padding: theme.spacing.md,
   },
   title: {
     ...commonStyles.headerText,
     textAlign: 'center',
-    marginTop: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  date: {
-    fontSize: theme.text.body,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: theme.spacing.md,
+    marginVertical: theme.spacing.md,
+    fontSize: 24,
   },
   emojiScroll: {
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  emojiContentContainer: {
+    paddingHorizontal: theme.spacing.sm,
   },
   emojiButton: {
-    ...commonStyles.card,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginRight: theme.spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 80,
-    height: 80,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
   },
   selectedEmoji: {
     backgroundColor: theme.colors.secondary,
@@ -110,31 +121,34 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
   },
   emojiLabel: {
-    fontSize: theme.text.caption,
+    fontSize: 14,
     color: theme.colors.textPrimary,
-  },
-  messageContainer: {
-    flex: 1,
-    marginBottom: theme.spacing.md,
   },
   input: {
     ...commonStyles.input,
     minHeight: 120,
+    marginBottom: theme.spacing.lg,
+    padding: theme.spacing.sm,
+    borderRadius: 8,
     textAlignVertical: 'top',
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   saveButton: {
     ...commonStyles.buttonPrimary,
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   saveText: {
     ...commonStyles.buttonText,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    marginBottom: 15,
-  },
-  backButtonText: {
-    color: theme.colors.primary,
-    fontSize: 16,
+    fontSize: 18,
   },
 });
 

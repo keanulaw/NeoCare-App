@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Platform, ScrollView } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Platform, ScrollView, SafeAreaView } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db, auth } from '../firebaseConfig';
 import { collection, addDoc, serverTimestamp, doc, getDoc, query, where, getDocs } from 'firebase/firestore';
@@ -127,105 +127,102 @@ const AppointmentScreen = ({ route, navigation }) => {
   );
 
   return (
-    <ScrollView style={styles.container}>
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
-      <View style={styles.card}>
-        <Text style={styles.specialtyText}>Specialty Information</Text>
-        <Image source={{ uri: consultant.photoUrl }} style={styles.image} />
-        <Text style={styles.name}>Dr. {consultant.name}</Text>
-        <Text style={styles.specialty}>{consultant.specialty}</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView>
+        <View style={styles.card}>
+          <Text style={styles.specialtyText}>Specialty Information</Text>
+          <Image source={{ uri: consultant.photoUrl }} style={styles.image} />
+          <Text style={styles.name}>Dr. {consultant.name}</Text>
+          <Text style={styles.specialty}>{consultant.specialty}</Text>
 
-        <View style={styles.pickerContainer}>
-          <Text style={styles.label}>
-            Select Date (Available: {consultant.availableDays.join(', ')})
-          </Text>
-          <TouchableOpacity 
-            style={styles.pickerButton} 
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.pickerText}>
-              {moment(selectedDate).tz('Asia/Manila').format('LLLL')}
+          <View style={styles.pickerContainer}>
+            <Text style={styles.label}>
+              Select Date (Available: {consultant.availableDays.join(', ')})
             </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity 
+              style={styles.pickerButton} 
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.pickerText}>
+                {moment(selectedDate).tz('Asia/Manila').format('LLLL')}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        {availableConsultationHours.length > 0 ? (
+          {availableConsultationHours.length > 0 ? (
+            <View style={styles.selectionContainer}>
+              <Text style={styles.label}>Available Times for {selectedAvailableDay}</Text>
+              <View style={styles.optionsRow}>
+                {availableConsultationHours.map((hour, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.optionButton,
+                      selectedConsultationHour === hour && styles.optionButtonSelected,
+                    ]}
+                    onPress={() => setSelectedConsultationHour(hour)}
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      selectedConsultationHour === hour && { color: '#fff' }
+                    ]}>
+                      {hour}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.noAvailableText}>
+              No available times for {selectedAvailableDay}
+            </Text>
+          )}
+
           <View style={styles.selectionContainer}>
-            <Text style={styles.label}>Available Times for {selectedAvailableDay}</Text>
+            <Text style={styles.label}>Select Platform</Text>
             <View style={styles.optionsRow}>
-              {availableConsultationHours.map((hour, index) => (
+              {consultant.platform.map((option, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
                     styles.optionButton,
-                    selectedConsultationHour === hour && styles.optionButtonSelected,
+                    selectedPlatform === option && styles.optionButtonSelected,
                   ]}
-                  onPress={() => setSelectedConsultationHour(hour)}
+                  onPress={() => setSelectedPlatform(option)}
                 >
                   <Text style={[
                     styles.optionText,
-                    selectedConsultationHour === hour && { color: '#fff' }
+                    selectedPlatform === option && { color: '#fff' }
                   ]}>
-                    {hour}
+                    {option}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
-        ) : (
-          <Text style={styles.noAvailableText}>
-            No available times for {selectedAvailableDay}
-          </Text>
-        )}
-
-        <View style={styles.selectionContainer}>
-          <Text style={styles.label}>Select Platform</Text>
-          <View style={styles.optionsRow}>
-            {consultant.platform.map((option, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.optionButton,
-                  selectedPlatform === option && styles.optionButtonSelected,
-                ]}
-                onPress={() => setSelectedPlatform(option)}
-              >
-                <Text style={[
-                  styles.optionText,
-                  selectedPlatform === option && { color: '#fff' }
-                ]}>
-                  {option}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
-      </View>
-      <TouchableOpacity style={styles.button} onPress={handleMakeAppointment}>
-        <Text style={commonStyles.buttonText}>Book Appointment</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={handleMakeAppointment}>
+          <Text style={commonStyles.buttonText}>Book Appointment</Text>
+        </TouchableOpacity>
 
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleDateChange}
-          minimumDate={new Date()}
-        />
-      )}
-    </ScrollView>
+        {showDatePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleDateChange}
+            minimumDate={new Date()}
+          />
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    ...commonStyles.screenContainer,
+    flex: 1,
+    backgroundColor: '#FFF4E6',
   },
   card: {
     ...commonStyles.card,
@@ -310,17 +307,6 @@ const styles = StyleSheet.create({
     color: '#FF0000',
     fontSize: 14,
     marginTop: 5,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    padding: 10,
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
   },
 });
 

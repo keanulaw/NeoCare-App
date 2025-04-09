@@ -6,64 +6,86 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import GetStarted from './component/GetStarted';
 import Dashboard from './component/Dashboard';
-import CalendarScreen from './component/CalendarScreen';
+import BookingsScreen from './component/BookingsScreen'; // Use BookingsScreen for Calendar
 import MessageScreen from './component/MessageScreen';
-import ProfileScreen from './component/ProfileScreen';
-import AssessmentScreen from './component/AssessmentScreen'; // Import the AssessmentScreen
-import { Image, StyleSheet } from 'react-native';
-import app from './firebaseConfig'; // Add this line to import Firebase
-import RegisterScreen from './component/RegisterScreen'; // Import the RegisterScreen
-import LoginScreen from './component/LoginScreen'; // Import the LoginScreen
-import MoodDetail from './component/MoodDetail'; // Import MoodDetail
-import BirthingCenterLocator from './component/BirthingCenterLocator'; // Import the component
-import ConsultantScreen from './component/ConsultantScreen'; // Import ConsultantScreen
-import ConsultantDetailScreen from './component/ConsultantDetailScreen'; // Import the new screen
-import ChatScreen from './component/ChatScreen'; // Import the ChatScreen
-import AppointmentScreen from './component/AppointmentScreen'; // Import the ChatScreen
-import BookingsScreen from './component/BookingsScreen'; // Adjust the path as necessary
-import Tracker from './component/Tracker'; // Import the Tracker component
+import ProfileScreen from './component/ProfileScreen'; // New Profile screen
+import AssessmentScreen from './component/AssessmentScreen';
+import { StyleSheet } from 'react-native';
+import app from './firebaseConfig';
+import RegisterScreen from './component/RegisterScreen';
+import LoginScreen from './component/LoginScreen';
+import MoodDetail from './component/MoodDetail';
+import BirthingCenterLocator from './component/BirthingCenterLocator';
+import ConsultantScreen from './component/ConsultantScreen';
+import ConsultantDetailScreen from './component/ConsultantDetailScreen';
+import ChatScreen from './component/ChatScreen';
+import AppointmentScreen from './component/AppointmentScreen';
+import Tracker from './component/Tracker';
 import ChatBotScreen from './component/ChatBotScreen';
-
+import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Bottom Tab Navigator
+// Create an animated version of Ionicons
+const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
+
+function AnimatedTabIcon({ name, focused, size, color }) {
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: focused ? withSpring(1.2) : withSpring(1) }],
+  }));
+
+  return <AnimatedIonicons name={name} size={size} color={color} style={animatedStyle} />;
+}
+
 function HomeTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
+          let iconName = '';
 
           if (route.name === 'Home') {
-            iconName = focused
-              ? require('./assets/home-filled.png')
-              : require('./assets/home-outline.png');
+            iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Calendar') {
-            iconName = focused
-              ? require('./assets/calendar-filled.png')
-              : require('./assets/calendar-outline.png');
+            iconName = focused ? 'calendar' : 'calendar-outline';
           } else if (route.name === 'Message') {
-            iconName = focused
-              ? require('./assets/message-filled.png')
-              : require('./assets/message-outline.png');
+            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           } else if (route.name === 'Profile') {
-            iconName = focused
-              ? require('./assets/profile-filled.png')
-              : require('./assets/profile-outline.png');
+            iconName = focused ? 'person' : 'person-outline';
           }
 
-          return <Image source={iconName} style={styles.tabIcon} />;
+          return (
+            <AnimatedTabIcon name={iconName} focused={focused} size={size} color={color} />
+          );
         },
-        tabBarActiveTintColor: '#D47FA6', // Active tab color
-        tabBarInactiveTintColor: '#888', // Inactive tab color
-        tabBarStyle: styles.tabBar, // Custom tab bar style
-        headerShown: false, // Hide the header
+        tabBarActiveTintColor: '#D47FA6',
+        tabBarInactiveTintColor: '#888',
+        tabBarLabelStyle: {
+          fontSize: 12,
+          marginBottom: 2,
+        },
+        headerShown: false,
+        tabBarStyle: {
+          position: 'absolute',
+          bottom: 16,
+          left: 16,
+          right: 16,
+          height: 60,
+          backgroundColor: '#fff',
+          borderRadius: 12,
+          elevation: 10, // Android shadow
+          shadowColor: '#000', // iOS shadow
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 5,
+          paddingVertical: 8,
+        },
       })}
     >
       <Tab.Screen name="Home" component={Dashboard} />
-      <Tab.Screen name="Calendar" component={CalendarScreen} />
+      <Tab.Screen name="Calendar" component={BookingsScreen} />
       <Tab.Screen name="Message" component={MessageScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -74,48 +96,34 @@ export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-        {/* GetStarted Screen */}
         <Stack.Screen name="GetStarted" component={GetStarted} />
-        {/* HomeTabs (Dashboard as Home) */}
         <Stack.Screen name="HomeTabs" component={HomeTabs} />
-        {/* Assessment Screen */}
         <Stack.Screen name="Assessment" component={AssessmentScreen} />
-        {/* Register Screen */}
         <Stack.Screen name="Register" component={RegisterScreen} />
-        {/* Login Screen */}
         <Stack.Screen name="Login" component={LoginScreen} />
-        {/* MoodDetail Screen */}
         <Stack.Screen name="MoodDetail" component={MoodDetail} />
-        {/* Birthing Center Locator Screen */}
         <Stack.Screen name="BirthingCenterLocator" component={BirthingCenterLocator} />
-        {/* Consultant Screen */}
         <Stack.Screen name="ConsultantScreen" component={ConsultantScreen} />
-        {/* Consultant Detail Screen */}
         <Stack.Screen name="ConsultantDetail" component={ConsultantDetailScreen} />
-        {/* Chat Screen */}
         <Stack.Screen name="Chat" component={ChatScreen} />
-        {/* Appointment Screen - adding options for better UX */}
-        <Stack.Screen 
+        <Stack.Screen
           name="AppointmentScreen"
           component={AppointmentScreen}
           options={{
             headerShown: true,
             title: 'Book Appointment',
-            headerStyle: {
-              backgroundColor: '#FFF4E6',
-            },
+            headerStyle: { backgroundColor: '#FFF4E6' },
             headerTintColor: '#D47FA6',
           }}
         />
-        {/* Bookings Screen */}
-        <Stack.Screen 
-          name="Bookings" 
-          component={BookingsScreen} 
+        <Stack.Screen
+          name="Bookings"
+          component={BookingsScreen}
           options={{ title: 'My Bookings' }}
         />
-        <Stack.Screen 
-          name="Tracker" 
-          component={Tracker} 
+        <Stack.Screen
+          name="Tracker"
+          component={Tracker}
           options={{ title: 'Pregnancy Tracker' }}
         />
         <Stack.Screen name="ChatBot" component={ChatBotScreen} options={{ title: 'Chat Bot' }} />
@@ -125,14 +133,5 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  tabIcon: {
-    width: 24,
-    height: 24,
-  },
-  tabBar: {
-    backgroundColor: '#fff',
-    borderTopWidth: 0,
-    elevation: 10,
-    paddingVertical: 10,
-  },
+  // Additional styles if needed
 });
