@@ -41,6 +41,11 @@
           "mode": "production"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d44e156f-b610-4566-a530-375422deae3d"
+      }
+    }
   }
 }

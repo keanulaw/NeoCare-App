@@ -38,12 +38,12 @@ const BookingsScreen = ({ navigation }) => {
         setAppointments(appointmentsData);
 
         // Optional: Alert for each appointment.
-        appointmentsData.forEach(appt => {
-          Alert.alert(
-            'Appointment Reminder',
-            `Your appointment with ${appt.consultantName} is scheduled for ${appt.date.toLocaleString()} (Status: ${appt.status})`
-          );
-        });
+       // appointmentsData.forEach(appt => {
+         // Alert.alert(
+          //  'Appointment Reminder',
+         //   `Your appointment with ${appt.consultantName} is scheduled for ${appt.date.toLocaleString()} (Status: ${appt.status})`
+        //  );
+       // });
       } catch (error) {
         console.error("Error fetching appointments:", error);
       }
