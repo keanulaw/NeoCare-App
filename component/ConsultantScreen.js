@@ -50,6 +50,9 @@ export default function ConsultantScreen({ navigation }) {
           <Text style={styles.name}>{item.name || 'Unknown User'}</Text>
           <Text style={styles.specialty}>{item.specialty || 'No Specialty'}</Text>
           <Text style={styles.rating}>⭐ {item.rating || 'N/A'}</Text>
+          {item.hourlyRate != null && (
+            <Text style={styles.rate}>₱{item.hourlyRate}/hr</Text>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -133,5 +136,11 @@ const styles = StyleSheet.create({
   rating: {
     fontSize: 14,
     color: '#FFD700',
+  },
+  rate: {
+    fontSize: 14,
+    color: '#FFD700',
+    marginTop: 4,
+    fontWeight: '600',
   },
 });

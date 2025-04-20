@@ -17,9 +17,8 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
   }
 
   const handleMakeAppointment = () => {
-    console.log("Make Appointment button pressed.");
     if (!auth.currentUser) {
-      Alert.alert("Not Logged In", "Please log in to make an appointment.");
+      Alert.alert('Log in required', 'Please log in to book.');
       return;
     }
     navigation.navigate('AppointmentScreen', { consultant });
@@ -87,16 +86,20 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomHeader title="Consultant Details" navigation={navigation} />
+      <CustomHeader title="Details" />
       <ScrollView>
-        {/* Profile Section */}
         <View style={styles.profileContainer}>
-          <Image 
-            source={{ uri: consultant.photoUrl || 'https://via.placeholder.com/150' }} 
-            style={styles.profileImage} 
+          <Image
+            source={{ uri: consultant.photoUrl }}
+            style={styles.profileImage}
           />
           <Text style={styles.name}>Dr. {consultant.name}</Text>
           <Text style={styles.specialty}>{consultant.specialty}</Text>
+          {consultant.hourlyRate != null && (
+            <Text style={styles.sessionPrice}>
+              ₱{consultant.hourlyRate} per hour
+            </Text>
+          )}
         </View>
 
         {/* About Section */}
@@ -155,7 +158,10 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
 
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.appointmentButton} onPress={handleMakeAppointment}>
+          <TouchableOpacity
+            style={styles.appointmentButton}
+            onPress={handleMakeAppointment}
+          >
             <Text style={styles.buttonText}>Make Appointment</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.chatButton} onPress={handleChatNavigation}>
@@ -168,58 +174,21 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF4E6',
-  },
-  image: {
-    width: '100%',
-    height: 250,
-  },
-  header: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  specialty: {
-    fontSize: 18,
-    color: '#666',
-  },
-  sessionPrice: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: 'bold',
-    marginTop: 5,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginVertical: 10,
-  },
-  rating: {
-    fontSize: 16,
-    color: '#FFD700',
-  },
-  section: {
-    padding: 20,
+  container: { flex: 1, backgroundColor: '#FFF4E6' },
+  profileContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
     backgroundColor: '#fff',
     marginBottom: 10,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  sectionContent: {
+  profileImage: { width: 120, height: 120, borderRadius: 60, marginBottom: 10 },
+  name: { fontSize: 24, fontWeight: 'bold', color: '#333' },
+  specialty: { fontSize: 18, color: '#666' },
+  sessionPrice: {
     fontSize: 16,
+    fontWeight: '600',
     color: '#333',
-    marginBottom: 5,
+    marginTop: 6,
   },
   appointmentButton: {
     margin: 20,
@@ -240,25 +209,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  profileContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-    marginBottom: 10,
-  },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 10,
-  },
+  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  buttonContainer: { flexDirection: 'row', justifyContent: 'center' },
   detailCard: {
     backgroundColor: '#fff',
     padding: 20,
@@ -270,14 +222,24 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 3,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  sectionContent: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 5,
+  },
   detailLabel: {
     fontWeight: 'bold',
     color: '#555',
   },
-  buttonContainer: {
+  ratingContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 20,
+    justifyContent: 'center',
+    marginVertical: 10,
   },
   submitRatingButton: {
     backgroundColor: '#6bc4c1',
