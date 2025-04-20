@@ -3,9 +3,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, Image, TouchableOpacity,
   Alert, Platform, ScrollView,
-  SafeAreaView, ActivityIndicator, StyleSheet
+  SafeAreaView, ActivityIndicator, StyleSheet, Button
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import {
   collection, addDoc, serverTimestamp,
@@ -26,6 +26,8 @@ export default function AppointmentScreen({ route, navigation }) {
   const [bookedTimes, setBookedTimes] = useState([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
+  const [date, setDate] = useState(new Date());
+  const [showIosPicker, setShowIosPicker] = useState(false);
 
   const fetchBooked = useCallback(async () => {
     const day = moment(selectedDate).tz('Asia/Manila').format('dddd');
@@ -50,6 +52,23 @@ export default function AppointmentScreen({ route, navigation }) {
     try {
       const user = auth.currentUser;
       if (!user) throw new Error('Not logged in');
+
+      // Fetch the consultant's hourly rate
+      const consultRef = doc(db, 'consultants', usedConsultant.id);
+      const consultSnap = await getDoc(consultRef);
+      if (!consultSnap.exists()) {
+        Alert.alert('Error', 'Doctor not found.');
+        return;
+      }
+      const { hourlyRate } = consultSnap.data();
+      if (!hourlyRate || isNaN(hourlyRate) || hourlyRate <= 0) {
+        Alert.alert('Error', 'Invalid hourly rate for this doctor.');
+        return;
+      }
+
+      // Convert to centavos (₱500 → 50000)
+      const amount = Math.round(hourlyRate * 100);
+
       const ph = moment(selectedDate).tz('Asia/Manila');
       const [time, mod] = selectedHour.split(' ');
       let [h, m] = time.split(':').map(Number);
@@ -58,27 +77,24 @@ export default function AppointmentScreen({ route, navigation }) {
       const dt = ph.toDate();
       dt.setHours(h, m, 0, 0);
 
-      const udoc = await getDoc(doc(db, 'users', user.uid));
-      const fullName = user.displayName || udoc.data()?.fullName || 'User';
-
-      await addDoc(collection(db, 'appointmentRequests'), {
-        consultantId: usedConsultant.id,
-        consultantName: usedConsultant.name,
+      await addDoc(collection(db, 'bookings'), {
         userId: user.uid,
-        fullName,
-        date: dt,
-        availableDay: ph.format('dddd'),
-        consultationHour: selectedHour,
-        platform: selectedPlatform,
+        doctorId: usedConsultant.id,
+        dateTime: serverTimestamp(),
         status: 'pending',
+        amount,            // now based on hourlyRate
+        currency: 'PHP',
+        paymentStatus: 'unpaid',
         createdAt: serverTimestamp(),
+        bookedFor: dt,
       });
 
       Alert.alert('Success', 'Booked!', [
         { text: 'OK', onPress: () => navigation.navigate('ConsultantScreen') },
       ]);
     } catch (err) {
-      Alert.alert('Error', err.message);
+      console.error(err);
+      Alert.alert('Booking failed', err.message);
     } finally {
       setIsBooking(false);
     }
@@ -87,6 +103,35 @@ export default function AppointmentScreen({ route, navigation }) {
   const availableHours = (usedConsultant.consultationHours || []).filter(
     h => !bookedTimes.includes(h)
   );
+
+  // Unified onChange for both platforms
+  const onChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      // Android: event.type will be 'set' or 'dismissed'
+      if (event.type === 'set' && selectedDate) {
+        setDate(selectedDate);
+      }
+    } else {
+      // iOS: always get a selectedDate
+      setDate(selectedDate || date);
+      setShowIosPicker(false);
+    }
+  };
+
+  // Show the picker on tap
+  const showPicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: date,
+        onChange,
+        mode: 'datetime',
+        minimumDate: new Date(),
+        is24Hour: true,
+      });
+    } else {
+      setShowIosPicker(true);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -107,7 +152,7 @@ export default function AppointmentScreen({ route, navigation }) {
             <Text style={styles.label}>
               Date (Available: {usedConsultant.availableDays.join(', ')})
             </Text>
-            <TouchableOpacity onPress={()=>setShowDatePicker(true)} style={styles.pickerButton}>
+            <TouchableOpacity onPress={showPicker} style={styles.pickerButton}>
               <Text style={styles.pickerText}>
                 {moment(selectedDate).tz('Asia/Manila').format('LL')}
               </Text>
@@ -152,16 +197,14 @@ export default function AppointmentScreen({ route, navigation }) {
           )}
         </TouchableOpacity>
 
-        {showDatePicker&&(
+        {Platform.OS === 'ios' && showIosPicker && (
           <DateTimePicker
-            value={selectedDate}
-            mode="date"
-            display={Platform.OS==='ios'?'spinner':'default'}
-            onChange={(_,d)=>{
-              setShowDatePicker(false);
-              if(d) setSelectedDate(d);
-            }}
+            value={date}
+            mode="datetime"
+            display="default"
+            onChange={onChange}
             minimumDate={new Date()}
+            style={styles.picker}
           />
         )}
       </ScrollView>
@@ -190,4 +233,5 @@ const styles=StyleSheet.create({
   pickerButton:{backgroundColor:'#FFF',borderRadius:10,padding:15,borderWidth:1,borderColor:'#E0E0E0'},
   pickerText:{fontSize:16,color:'#333'},
   selectionContainer:{marginBottom:20},
+  picker: { marginTop: 12 },
 });
