@@ -19,6 +19,7 @@ import {
   where,
   onSnapshot,
   doc,
+  getDoc,
   updateDoc
 } from 'firebase/firestore';
 import theme from '../src/theme';
@@ -27,16 +28,43 @@ import CustomHeader from './CustomHeader';
 
 export default function BookingsScreen({ navigation }) {
   const [bookings, setBookings] = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const q = query(
       collection(db, 'bookings'),
       where('userId', '==', auth.currentUser.uid)
     );
-    const unsub = onSnapshot(q, snap => {
-      setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
+
+    const unsub = onSnapshot(q, async snap => {
+      try {
+        const bookingsWithNames = await Promise.all(
+          snap.docs.map(async d => {
+            const booking = { id: d.id, ...d.data() };
+            let doctorName = '';
+
+            if (booking.doctorId) {
+              const doctorDoc = await getDoc(doc(db, 'consultants', booking.doctorId));
+              if (doctorDoc.exists()) {
+                const data = doctorDoc.data();
+                doctorName = data.name || '';
+              }
+            }
+
+            return {
+              ...booking,
+              doctorName
+            };
+          })
+        );
+
+        setBookings(bookingsWithNames);
+      } catch (e) {
+        console.error('Error fetching doctor names', e);
+        Alert.alert('Error', 'Could not load doctor details.');
+      } finally {
+        setLoading(false);
+      }
     }, err => {
       console.error(err);
       setLoading(false);
@@ -48,9 +76,8 @@ export default function BookingsScreen({ navigation }) {
 
   const handlePay = async (booking) => {
     try {
-      // 1) request a PayMongo link
       const resp = await fetch(
-        'http://192.168.1.2:3000/api/payments/link',  // ← include your port!
+        'http://192.168.1.2:3000/api/payments/link',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -60,14 +87,10 @@ export default function BookingsScreen({ navigation }) {
       const { url, error } = await resp.json();
       if (error || !url) throw new Error(error || 'No payment URL returned');
 
-      // 2) open the hosted checkout
       await Linking.openURL(url);
-
-      // 3) mark as paid in Firestore
       await updateDoc(doc(db, 'bookings', booking.id), {
         paymentStatus: 'paid'
       });
-
     } catch (e) {
       console.error('Payment error', e);
       Alert.alert('Payment failed', e.message || 'Try again later.');
@@ -76,17 +99,19 @@ export default function BookingsScreen({ navigation }) {
 
   const renderItem = ({ item }) => (
     <View style={styles.appointmentCard}>
-      <Text style={styles.appointmentTitle}>Dr. {item.doctorName || item.doctorId}</Text>
+      <Text style={styles.appointmentTitle}>
+        Dr. {item.doctorName || 'Unknown Doctor'}
+      </Text>
 
       <Text style={styles.appointmentDetails}>
-        📅 { new Date(item.dateTime.seconds * 1000).toLocaleString() }
+        📅 {new Date(item.dateTime.seconds * 1000).toLocaleString()}
       </Text>
 
       <Text style={styles.appointmentStatus}>
-        Status: <Text style={{ fontWeight:'bold' }}>{item.status}</Text>
+        Status: <Text style={{ fontWeight: 'bold' }}>{item.status}</Text>
       </Text>
       <Text style={styles.appointmentStatus}>
-        Payment: <Text style={{ fontWeight:'bold' }}>{item.paymentStatus}</Text>
+        Payment: <Text style={{ fontWeight: 'bold' }}>{item.paymentStatus}</Text>
       </Text>
 
       {item.status === 'approved' && item.paymentStatus === 'unpaid' && (
