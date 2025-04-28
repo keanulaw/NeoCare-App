@@ -20,7 +20,7 @@ const MONTHS   = [
   'July','August','September','October','November','December'
 ];
 
-// Format “2025-04-25” → “April 25, 2025 (Friday, Weekday)”
+// Format "2025-04-25" → "April 25, 2025 (Friday, Weekday)"
 const formatWordDate = iso => {
   const [y,m,d] = iso.split('-').map(Number);
   const date = new Date(y, m-1, d);
@@ -36,7 +36,7 @@ const normalize = s =>
     .replace(/[^a-z0-9]/gi, '')
     .toLowerCase();
 
-// Fetch consultant by normalized name
+// Fetch consultant by normalized name (unused here, but kept)
 const getConsultantByName = async rawName => {
   const target = normalize(rawName);
   const snap = await getDocs(collection(db, 'consultants'));
@@ -76,70 +76,41 @@ const upcomingDates = (wdList, span = 30) => {
   return out;
 };
 
-// Parse “today”, “tomorrow/next day”, “this <weekday>”, “next <weekday>”,
-// month-day phrases, or explicit ISO
+// Parse "today", "tomorrow", "this Monday", "2025-04-25", etc.
 const parseDateTime = text => {
   const t = String(text || '').trim();
   const lower = t.toLowerCase();
+  const today = new Date();
 
-  // today
   if (/\btoday\b/.test(lower)) {
-    const d = new Date();
-    return { date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, time: null };
+    return { date: `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`, time: null };
   }
-  // tomorrow or next day
   if (/\btomorrow\b/.test(lower) || /\bnext day\b/.test(lower)) {
-    const d = new Date();
-    d.setDate(d.getDate()+1);
+    const d = new Date(); d.setDate(d.getDate()+1);
     return { date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, time: null };
   }
-  // this <weekday>
-  const thisWd = lower.match(/\bthis\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i);
-  if (thisWd) {
-    const wg = thisWd[1][0].toUpperCase() + thisWd[1].slice(1).toLowerCase();
-    const idx = WEEKDAYS.indexOf(wg);
-    const d = new Date();
-    const delta = (idx - d.getDay() + 7) % 7;
-    d.setDate(d.getDate() + delta);
-    return { date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, time: null };
-  }
-  // next <weekday>
-  const nextWd = lower.match(/\bnext\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i);
-  if (nextWd) {
-    const wg = nextWd[1][0].toUpperCase() + nextWd[1].slice(1).toLowerCase();
-    const idx = WEEKDAYS.indexOf(wg);
-    const d = new Date();
+  let m = lower.match(/\b(this|next)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (m) {
+    const which = m[1], dayName = m[2];
+    const idx = WEEKDAYS.indexOf(dayName[0].toUpperCase() + dayName.slice(1));
+    let d = new Date();
     let delta = (idx - d.getDay() + 7) % 7;
-    if (delta === 0) delta = 7;
+    if (which === 'next' && delta === 0) delta = 7;
     d.setDate(d.getDate() + delta);
     return { date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, time: null };
   }
-  // month-day, e.g. “April 21”
-  const monthDay = lower.match(
-    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i
-  );
-  if (monthDay) {
-    const mIdx = MONTHS.findIndex(m => m.toLowerCase() === monthDay[1].toLowerCase()) + 1;
-    const day = parseInt(monthDay[2], 10);
-    const year = new Date().getFullYear();
-    const iso = `${year}-${String(mIdx).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    return { date: iso, time: null };
-  }
-  // explicit ISO
-  const explicit = lower.match(/(\d{4}-\d{2}-\d{2})/);
-  const date = explicit ? explicit[1] : null;
-  // time if any
+  m = lower.match(/(\d{4}-\d{2}-\d{2})/);
+  const date = m ? m[1] : null;
   const tm = t.match(/(\d{1,2}(?::\d{2})?\s*(?:AM|PM)?)/i);
   return { date, time: tm ? tm[1] : null };
 };
 
-// Parse user-entered time and normalize to "H:MM AM/PM"
+// Parse "8 PM" or "14:30" into "H:MM AM/PM"
 const parseUserTime = input => {
   const m = String(input || '').trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
   if (!m) return null;
-  let h = parseInt(m[1], 10);
-  const mm = m[2] ? parseInt(m[2], 10) : 0;
-  const suffix = m[3] ? m[3].toUpperCase() : (h >= 12 ? 'PM' : 'AM');
+  let h = parseInt(m[1], 10), mm = m[2] ? parseInt(m[2], 10) : 0;
+  let suffix = m[3] ? m[3].toUpperCase() : (h >= 12 ? 'PM' : 'AM');
   if (suffix === 'PM' && h < 12) h += 12;
   if (suffix === 'AM' && h === 12) h = 0;
   const dispH = h % 12 === 0 ? 12 : h % 12;
@@ -182,7 +153,7 @@ export default function ChatBotScreen({ navigation }) {
     setLoading(true);
 
     try {
-      // 0) recommendation
+      // 0) Recommendation
       if (stage === '') {
         const resp = await fetch(BACKEND_URL, {
           method: 'POST',
@@ -192,28 +163,17 @@ export default function ChatBotScreen({ navigation }) {
         const data = await resp.json();
         if (!resp.ok || data.error) throw new Error(data.error || 'Service error.');
 
-        let recDoc, recName;
-        if (data.doctorId) {
-          recDoc = await getConsultantById(data.doctorId);
-          recName = data.doctorName;
-        } else {
-          const m = data.recommendation?.match(/Dr\.\s*([\w\s]+)/i);
-          recName = m ? `Dr. ${m[1].trim()}` : data.recommendation;
-          recDoc = await getConsultantByName(recName);
-        }
+        const recDoc = await getConsultantById(data.doctorId);
         if (!recDoc) throw new Error('No matching doctor found.');
 
-        const datesList = upcomingDates(recDoc.availableDays || [], 14);
         setDoctor(recDoc);
+        const datesList = upcomingDates(recDoc.availableDays || [], 14);
         setAvailableDates(datesList);
 
-        const preview = datesList.slice(0,5)
-          .map(d => `• ${formatWordDate(d)}`)
-          .join('\n');
+        const preview = datesList.slice(0,5).map(d => `• ${formatWordDate(d)}`).join('\n');
         setMessages(prev => GiftedChat.append(prev, [{
           _id: Math.random(),
-          text:
-`I recommend **${recDoc.name}**.
+          text: `${data.explanation}
 Next available dates:
 ${preview}
 
@@ -223,13 +183,12 @@ Shall we book an appointment? (Yes/No)`,
         }]));
         setStage('confirmBooking');
       }
-      // 1) confirm booking
+      // 1) Confirm booking
       else if (stage === 'confirmBooking') {
         if (/^y(es)?$/i.test(userText)) {
           setMessages(prev => GiftedChat.append(prev, [{
             _id: Math.random(),
-            text:
-`Great! Choose a date:
+            text: `Great! Choose a date:
 ${availableDates.map(d => formatWordDate(d)).join('\n')}`,
             createdAt: new Date(),
             user: { _id: 2, name: 'HealthBot' },
@@ -245,14 +204,13 @@ ${availableDates.map(d => formatWordDate(d)).join('\n')}`,
           resetConversation();
         }
       }
-      // 2) select date
+      // 2) Select date
       else if (stage === 'selectDate') {
         const { date } = parseDateTime(userText);
         if (!date || !availableDates.includes(date)) {
           setMessages(prev => GiftedChat.append(prev, [{
             _id: Math.random(),
-            text:
-`Sorry, ${formatWordDate(date || '0001-01-01')} isn’t available.
+            text: `Sorry, ${formatWordDate(date || '0001-01-01')} isn't available.
 Please pick from:
 ${availableDates.map(d => formatWordDate(d)).join('\n')}`,
             createdAt: new Date(),
@@ -263,21 +221,20 @@ ${availableDates.map(d => formatWordDate(d)).join('\n')}`,
         setChosenDate(date);
         setMessages(prev => GiftedChat.append(prev, [{
           _id: Math.random(),
-          text:
-`What time on ${formatWordDate(date)}?
+          text: `What time on ${formatWordDate(date)}?
 Options: ${doctor.consultationHours.join(', ')}`,
           createdAt: new Date(),
           user: { _id: 2, name: 'HealthBot' },
         }]));
         setStage('selectTime');
       }
-      // 3) select time
+      // 3) Select time
       else if (stage === 'selectTime') {
         const userTime = parseUserTime(userText);
         if (!userTime) {
           setMessages(prev => GiftedChat.append(prev, [{
             _id: Math.random(),
-            text: 'Please enter a time like “8 PM” or “14:30”.',
+            text: 'Please enter a time like "8 PM" or "14:30".',
             createdAt: new Date(),
             user: { _id: 2, name: 'HealthBot' },
           }]));
@@ -290,7 +247,7 @@ Options: ${doctor.consultationHours.join(', ')}`,
         if (!matchSlot) {
           setMessages(prev => GiftedChat.append(prev, [{
             _id: Math.random(),
-            text: `Sorry, ${userTime} isn’t available. Available times: ${doctor.consultationHours.join(', ')}`,
+            text: `Sorry, ${userTime} isn't available. Available times: ${doctor.consultationHours.join(', ')}`,
             createdAt: new Date(),
             user: { _id: 2, name: 'HealthBot' },
           }]));
@@ -305,44 +262,32 @@ Options: ${doctor.consultationHours.join(', ')}`,
         }]));
         setStage('selectPlatform');
       }
-      // 4) select platform
+      // 4) Select platform
       else if (stage === 'selectPlatform') {
-        const lower = userText.toLowerCase();
-        if (lower.includes('online')) setChosenPlatform('Online');
-        else if (lower.includes('in person') || lower.includes('person')) setChosenPlatform('In Person');
-        else {
-          setMessages(prev => GiftedChat.append(prev, [{
-            _id: Math.random(),
-            text: 'Please reply “Online” or “In Person.”',
-            createdAt: new Date(),
-            user: { _id: 2, name: 'HealthBot' },
-          }]));
-          return;
-        }
+        const platform = userText.toLowerCase().includes('online') ? 'Online' : 'In Person';
+        setChosenPlatform(platform);
         setMessages(prev => GiftedChat.append(prev, [{
           _id: Math.random(),
-          text:
-`Confirm appointment:
+          type: 'confirm',
+          text: `Confirm appointment:
 ${formatWordDate(chosenDate)}
 Time: ${chosenTime}
-Mode: ${chosenPlatform}
+Mode: ${platform}
 (Yes/No)`,
           createdAt: new Date(),
           user: { _id: 2, name: 'HealthBot' },
-          type: 'confirm',
         }]));
         setStage('confirmDetails');
       }
-      // 5) confirm details
+      // 5) Confirm details
       else if (stage === 'confirmDetails') {
         if (/^y(es)?$/i.test(userText)) {
           navigation.navigate('AppointmentScreen', {
-            doctor,
+            consultant: doctor,
             date: chosenDate,
             time: chosenTime,
             platform: chosenPlatform,
           });
-          resetConversation();
         } else {
           setMessages(prev => GiftedChat.append(prev, [{
             _id: Math.random(),
@@ -350,8 +295,8 @@ Mode: ${chosenPlatform}
             createdAt: new Date(),
             user: { _id: 2, name: 'HealthBot' },
           }]));
-          resetConversation();
         }
+        resetConversation();
       }
     } catch (err) {
       setMessages(prev => GiftedChat.append(prev, [{
@@ -364,7 +309,7 @@ Mode: ${chosenPlatform}
     } finally {
       setLoading(false);
     }
-  }, [stage, availableDates, doctor, chosenDate, chosenTime, chosenPlatform]);
+  }, [stage, availableDates, doctor, chosenDate, chosenTime, chosenPlatform, navigation]);
 
   return (
     <View style={styles.container}>
@@ -385,14 +330,14 @@ Mode: ${chosenPlatform}
             <Icon name="send" size={24} style={{ margin: 8 }} />
           </Send>
         )}
-        renderFooter={() => loading ? <ActivityIndicator style={styles.spinner} size="small" /> : null}
+        renderFooter={() => loading && <ActivityIndicator style={styles.spinner} size="small" />}
         renderCustomView={props =>
           props.currentMessage.type === 'confirm' && (
             <TouchableOpacity
               style={styles.confirmBtn}
               onPress={() => {
                 navigation.navigate('AppointmentScreen', {
-                  doctor,
+                  consultant: doctor,
                   date: chosenDate,
                   time: chosenTime,
                   platform: chosenPlatform,

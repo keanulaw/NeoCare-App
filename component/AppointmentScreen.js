@@ -17,12 +17,20 @@ import theme from '../src/theme';
 import commonStyles from '../src/commonStyles';
 
 export default function AppointmentScreen({ route, navigation }) {
-  const { consultant } = route.params;
+  const {
+    consultant,
+    date: dateParam,
+    time: timeParam,
+    platform: platformParam
+  } = route.params;
+
   const usedConsultant = consultant;
-  const initialDate = getNextAvailableDate(usedConsultant.availableDays || []);
+  const initialDate = dateParam
+    ? new Date(`${dateParam}T00:00:00`)
+    : getNextAvailableDate(usedConsultant.availableDays || []);
   const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [selectedHour, setSelectedHour] = useState(null);
-  const [selectedPlatform, setSelectedPlatform] = useState(null);
+  const [selectedHour, setSelectedHour] = useState(timeParam || null);
+  const [selectedPlatform, setSelectedPlatform] = useState(platformParam || null);
   const [bookedTimes, setBookedTimes] = useState([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
