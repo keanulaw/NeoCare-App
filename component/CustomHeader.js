@@ -1,13 +1,20 @@
+// component/CustomHeader.js
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useNavigation } from '@react-navigation/native';
 
 const CustomHeader = ({
   title,
-  navigation,
+  navigation: navigationProp,
   showBack = true,
   showBookAppointment = false,
+  // if you want to deep-link book appointment with a specific consultant:
+  consultant,
 }) => {
+  // use the prop if given, otherwise grab from context
+  const navigation = navigationProp || useNavigation();
+
   const handleBackPress = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
@@ -15,7 +22,8 @@ const CustomHeader = ({
   };
 
   const handleBookAppointmentPress = () => {
-    navigation.navigate('AppointmentScreen');
+    // pass consultant along if needed:
+    navigation.navigate('AppointmentScreen', consultant ? { consultant } : {});
   };
 
   return (
@@ -27,9 +35,9 @@ const CustomHeader = ({
       ) : (
         <View style={styles.placeholder} />
       )}
-      
+
       <Text style={styles.headerTitle}>{title}</Text>
-      
+
       {showBookAppointment ? (
         <TouchableOpacity
           onPress={handleBookAppointmentPress}

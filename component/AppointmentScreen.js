@@ -1,15 +1,21 @@
-// AppointmentScreen.js is here
+// src/pages/AppointmentScreen.js
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, Image, TouchableOpacity,
-  Alert, Platform, ScrollView,
-  SafeAreaView, ActivityIndicator, StyleSheet, Button
+  Platform, ScrollView,
+  SafeAreaView, ActivityIndicator,
+  StyleSheet, ToastAndroid
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import {
-  collection, addDoc, serverTimestamp,
-  doc, getDoc, query, where, getDocs
+  collection,
+  addDoc,
+  Timestamp,
+  serverTimestamp,
+  query,
+  where,
+  getDocs
 } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 import moment from 'moment-timezone';
@@ -23,8 +29,8 @@ export default function AppointmentScreen({ route, navigation }) {
     time: timeParam,
     platform: platformParam
   } = route.params;
-
   const usedConsultant = consultant;
+
   const initialDate = dateParam
     ? new Date(`${dateParam}T00:00:00`)
     : getNextAvailableDate(usedConsultant.availableDays || []);
@@ -32,109 +38,90 @@ export default function AppointmentScreen({ route, navigation }) {
   const [selectedHour, setSelectedHour] = useState(timeParam || null);
   const [selectedPlatform, setSelectedPlatform] = useState(platformParam || null);
   const [bookedTimes, setBookedTimes] = useState([]);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [isBooking, setIsBooking] = useState(false);
-  const [date, setDate] = useState(new Date());
   const [showIosPicker, setShowIosPicker] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
 
-  const fetchBooked = useCallback(async () => {
-    const day = moment(selectedDate).tz('Asia/Manila').format('dddd');
-    const q = query(
-      collection(db, 'appointmentRequests'),
-      where('consultantId', '==', usedConsultant.id),
-      where('availableDay', '==', day)
-    );
-    const snap = await getDocs(q);
-    setBookedTimes(snap.docs.map(d => d.data().consultationHour));
+  const user = auth.currentUser;
+  const userId = user.uid;
+
+  // Available modes
+  const modes = [
+    ...(usedConsultant.availableModes?.includes('online') ? ['Online'] : []),
+    ...(usedConsultant.availableModes?.includes('in-person') ? ['In Person'] : [])
+  ];
+  const [mode, setMode] = useState(modes[0] || '');
+
+  // Fetch already-booked hours for the selected day
+  useEffect(() => {
+    (async () => {
+      const day = moment(selectedDate).tz('Asia/Manila').format('dddd');
+      const dupQ = query(
+        collection(db, 'bookings'),
+        where('consultantId', '==', usedConsultant.id),
+        where('availableDay', '==', day)
+      );
+      const snap = await getDocs(dupQ);
+      setBookedTimes(snap.docs.map(d => d.data().hour));
+    })();
   }, [selectedDate, usedConsultant.id]);
 
-  useEffect(() => {
-    fetchBooked();
-  }, [fetchBooked]);
-
-  const handleBook = async () => {
+  const handleBook = useCallback(async () => {
     if (!selectedHour || !selectedPlatform) {
-      return Alert.alert('Missing info', 'Select time & platform.');
+      ToastAndroid.show('Please select time & platform', ToastAndroid.SHORT);
+      return;
     }
     setIsBooking(true);
+
     try {
-      const user = auth.currentUser;
-      if (!user) throw new Error('Not logged in');
-
-      // Fetch the consultant's hourly rate
-      const consultRef = doc(db, 'consultants', usedConsultant.id);
-      const consultSnap = await getDoc(consultRef);
-      if (!consultSnap.exists()) {
-        Alert.alert('Error', 'Doctor not found.');
-        return;
-      }
-      const { hourlyRate } = consultSnap.data();
-      if (!hourlyRate || isNaN(hourlyRate) || hourlyRate <= 0) {
-        Alert.alert('Error', 'Invalid hourly rate for this doctor.');
-        return;
-      }
-
-      // Convert to centavos (₱500 → 50000)
-      const amount = Math.round(hourlyRate * 100);
-
-      const ph = moment(selectedDate).tz('Asia/Manila');
-      const [time, mod] = selectedHour.split(' ');
-      let [h, m] = time.split(':').map(Number);
-      if (mod === 'PM' && h < 12) h += 12;
-      if (mod === 'AM' && h === 12) h = 0;
-      const dt = ph.toDate();
-      dt.setHours(h, m, 0, 0);
-
       await addDoc(collection(db, 'bookings'), {
-        userId: user.uid,
-        doctorId: usedConsultant.id,
-        dateTime: serverTimestamp(),
+        userId,
+        consultantId: usedConsultant.id,
+        consultantName: usedConsultant.name,
+        doctorId: usedConsultant.userId,
+        date: Timestamp.fromDate(selectedDate),
+        availableDay: moment(selectedDate).tz('Asia/Manila').format('dddd'),
+        hour: selectedHour,
+        platform: selectedPlatform,
+        mode,
         status: 'pending',
-        amount,            // now based on hourlyRate
-        currency: 'PHP',
         paymentStatus: 'unpaid',
+        amount: usedConsultant.hourlyRate * 100,
         createdAt: serverTimestamp(),
-        bookedFor: dt,
       });
 
-      Alert.alert('Success', 'Booked!', [
-        { text: 'OK', onPress: () => navigation.navigate('ConsultantScreen') },
-      ]);
+      ToastAndroid.show('Booking successful!', ToastAndroid.SHORT);
+      navigation.goBack();
     } catch (err) {
-      console.error(err);
-      Alert.alert('Booking failed', err.message);
+      ToastAndroid.show(err.message, ToastAndroid.LONG);
     } finally {
       setIsBooking(false);
     }
-  };
+  }, [
+    userId,
+    usedConsultant,
+    selectedDate,
+    selectedHour,
+    selectedPlatform,
+    mode,
+    navigation
+  ]);
 
-  const availableHours = (usedConsultant.consultationHours || []).filter(
-    h => !bookedTimes.includes(h)
-  );
-
-  // Unified onChange for both platforms
-  const onChange = (event, selectedDate) => {
+  // Date picker handlers
+  const onChange = (event, newDate) => {
     if (Platform.OS === 'android') {
-      // Android: event.type will be 'set' or 'dismissed'
-      if (event.type === 'set' && selectedDate) {
-        setDate(selectedDate);
-      }
+      if (event.type === 'set' && newDate) setSelectedDate(newDate);
     } else {
-      // iOS: always get a selectedDate
-      setDate(selectedDate || date);
+      setSelectedDate(newDate || selectedDate);
       setShowIosPicker(false);
     }
   };
-
-  // Show the picker on tap
   const showPicker = () => {
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
-        value: date,
+        value: selectedDate,
         onChange,
-        mode: 'datetime',
+        mode: 'date',
         minimumDate: new Date(),
-        is24Hour: true,
       });
     } else {
       setShowIosPicker(true);
@@ -155,7 +142,6 @@ export default function AppointmentScreen({ route, navigation }) {
             source={{ uri: usedConsultant.photoUrl }}
             style={styles.image}
           />
-
           <View style={styles.pickerContainer}>
             <Text style={styles.label}>
               Date (Available: {usedConsultant.availableDays.join(', ')})
@@ -166,49 +152,51 @@ export default function AppointmentScreen({ route, navigation }) {
               </Text>
             </TouchableOpacity>
           </View>
-
           <View style={styles.selectionContainer}>
             <Text style={styles.label}>Select Time</Text>
             <Picker
               selectedValue={selectedHour}
-              onValueChange={v=>setSelectedHour(v)}
+              onValueChange={v => setSelectedHour(v)}
             >
-              <Picker.Item label="-- pick a time --" value={null}/>
-              {availableHours.map(h=>(
-                <Picker.Item key={h} label={h} value={h}/>
-              ))}
+              <Picker.Item label="-- pick a time --" value={null} />
+              { (usedConsultant.consultationHours || [])
+                  .filter(h => !bookedTimes.includes(h))
+                  .map(h => <Picker.Item key={h} label={h} value={h} />)
+              }
             </Picker>
           </View>
-
           <View style={styles.selectionContainer}>
             <Text style={styles.label}>Platform</Text>
             <Picker
               selectedValue={selectedPlatform}
-              onValueChange={v=>setSelectedPlatform(v)}
+              onValueChange={v => setSelectedPlatform(v)}
             >
-              <Picker.Item label="-- pick platform --" value={null}/>
-              <Picker.Item label="Online" value="Online"/>
-              <Picker.Item label="In Person" value="In Person"/>
+              <Picker.Item label="-- pick platform --" value={null} />
+              <Picker.Item label="Online" value="Online" />
+              <Picker.Item label="In Person" value="In Person" />
             </Picker>
           </View>
+          <Text style={styles.label}>Mode</Text>
+          <Picker selectedValue={mode} onValueChange={setMode} style={styles.picker}>
+            {modes.map(m => <Picker.Item key={m} label={m} value={m} />)}
+          </Picker>
         </View>
 
         <TouchableOpacity
-          style={[commonStyles.buttonPrimary, {margin:20}]}
+          style={[commonStyles.buttonPrimary, { margin: 20 }]}
           onPress={handleBook}
           disabled={isBooking}
         >
-          {isBooking?(
-            <ActivityIndicator color="#FFF"/>
-          ):(
-            <Text style={commonStyles.buttonText}>Book Appointment</Text>
-          )}
+          {isBooking
+            ? <ActivityIndicator color="#FFF" />
+            : <Text style={commonStyles.buttonText}>Book Appointment</Text>
+          }
         </TouchableOpacity>
 
         {Platform.OS === 'ios' && showIosPicker && (
           <DateTimePicker
-            value={date}
-            mode="datetime"
+            value={selectedDate}
+            mode="date"
             display="default"
             onChange={onChange}
             minimumDate={new Date()}
@@ -220,26 +208,39 @@ export default function AppointmentScreen({ route, navigation }) {
   );
 }
 
-const getNextAvailableDate = availableDays=>{
-  const ph = moment().tz('Asia/Manila');
-  let d = ph.clone().startOf('day');
-  for(let i=0;i<7;i++){
-    if(availableDays.includes(d.format('dddd'))) return d.toDate();
-    d.add(1,'day');
+const getNextAvailableDate = availableDays => {
+  const today = moment().tz('Asia/Manila').startOf('day');
+  for (let i = 0; i < 7; i++) {
+    if (availableDays.includes(today.format('dddd'))) {
+      return today.toDate();
+    }
+    today.add(1, 'day');
   }
-  return ph.toDate();
+  return today.toDate();
 };
 
-const styles=StyleSheet.create({
-  container:{flex:1,backgroundColor:'#FFF4E6'},
-  card:{...commonStyles.card,margin:20},
-  name:{fontSize:24,fontWeight:'bold',color:'#333',textAlign:'center',marginBottom:6},
-  rateLabel:{fontSize:16,fontWeight:'600',textAlign:'center',marginBottom:10,color:theme.colors.primary},
-  image:{width:120,height:120,borderRadius:60,alignSelf:'center'},
-  pickerContainer:{marginVertical:20},
-  label:{fontSize:16,fontWeight:'600',color:'#444',marginBottom:10},
-  pickerButton:{backgroundColor:'#FFF',borderRadius:10,padding:15,borderWidth:1,borderColor:'#E0E0E0'},
-  pickerText:{fontSize:16,color:'#333'},
-  selectionContainer:{marginBottom:20},
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#FFF4E6' },
+  card: { ...commonStyles.card, margin: 20 },
+  name: { fontSize: 24, fontWeight: 'bold', color: '#333', textAlign: 'center', marginBottom: 6 },
+  rateLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 10,
+    color: theme.colors.primary
+  },
+  image: { width: 120, height: 120, borderRadius: 60, alignSelf: 'center' },
+  pickerContainer: { marginVertical: 20 },
+  label: { fontSize: 16, fontWeight: '600', color: '#444', marginBottom: 10 },
+  pickerButton: {
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#E0E0E0'
+  },
+  pickerText: { fontSize: 16, color: '#333' },
+  selectionContainer: { marginBottom: 20 },
   picker: { marginTop: 12 },
 });

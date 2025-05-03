@@ -30,23 +30,25 @@ const LoginScreen = ({ navigation }) => {
       await signInWithEmailAndPassword(auth, email, password);
       navigation.navigate('GetStarted');
     } catch (error) {
-      setErrorMessage(error.message);
+      Alert.alert('Login failed', error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResetPassword = async () => {
-    if (!email) {
-      Alert.alert('Enter your email first');
+  const handleForgotPassword = async () => {
+    if (!email || !email.includes('@')) {
+      Alert.alert('Invalid email', 'Please enter your email in the email field above.');
       return;
     }
+    setLoading(true);
     try {
-      const auth = getAuth();
-      await sendPasswordResetEmail(auth, email);
-      Alert.alert('Reset email sent');
+      await sendPasswordResetEmail(getAuth(), email);
+      Alert.alert('Email sent', 'Check your inbox for password reset instructions.');
     } catch (error) {
-      Alert.alert(error.message);
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,6 +75,9 @@ const LoginScreen = ({ navigation }) => {
           value={password}
           onChangeText={setPassword}
         />
+        <TouchableOpacity onPress={handleForgotPassword}>
+          <Text style={styles.forgotText}>Forgot Password?</Text>
+        </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleLogin}
@@ -83,9 +88,6 @@ const LoginScreen = ({ navigation }) => {
           ) : (
             <Text style={styles.buttonText}>Login</Text>
           )}
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleResetPassword}>
-          <Text style={styles.link}>Forgot Password?</Text>
         </TouchableOpacity>
         <View style={styles.socialLogin}>
           <Text style={styles.socialText}>or</Text>
@@ -166,6 +168,11 @@ const styles = StyleSheet.create({
   socialText: {
     color: '#333',
     marginHorizontal: 10,
+  },
+  forgotText: {
+    color: '#007AFF',
+    alignSelf: 'flex-end',
+    marginVertical: 8,
   },
 });
 

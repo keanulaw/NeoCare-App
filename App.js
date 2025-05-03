@@ -1,6 +1,6 @@
 import 'react-native-reanimated';
 import 'react-native-get-random-values';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -10,7 +10,7 @@ import BookingsScreen from './component/BookingsScreen'; // Use BookingsScreen f
 import MessageScreen from './component/MessageScreen';
 import ProfileScreen from './component/ProfileScreen'; // New Profile screen
 import AssessmentScreen from './component/AssessmentScreen';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Alert } from 'react-native';
 import app from './firebaseConfig';
 import RegisterScreen from './component/RegisterScreen';
 import LoginScreen from './component/LoginScreen';
@@ -24,6 +24,12 @@ import Tracker from './component/Tracker';
 import ChatBotScreen from './component/ChatBotScreen';
 import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { getAuth } from 'firebase/auth';
+import {
+  registerForPushNotificationsAsync,
+  listenForNotifications,
+  configureAndroidChannel
+} from './component/Notifications'; // Updated path to Notifications.js
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -92,7 +98,39 @@ function HomeTabs() {
   );
 }
 
-export default function App() {
+function App() {
+  useEffect(() => {
+    // 1) create Android channel (no-op on iOS)
+    configureAndroidChannel();
+
+    // 2) register for push, then POST token to your backend
+    registerForPushNotificationsAsync().then(token => {
+      if (token) {
+        fetch('https://192.168.1.4/api/users/expo-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: getAuth().currentUser.uid,
+            token,
+          }),
+        }).catch(err => console.error('Failed to save push token:', err));
+      }
+    });
+
+    // 3) handle incoming notifications
+    const subscription = listenForNotifications(data => {
+      if (data.type === 'bookingAccepted') {
+        Alert.alert(
+          'Booking Accepted',
+          'Your appointment has been accepted—proceed to payment.'
+        );
+      }
+      // handle other data.type if needed
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
@@ -131,6 +169,8 @@ export default function App() {
     </NavigationContainer>
   );
 }
+
+export default App;
 
 const styles = StyleSheet.create({
   // Additional styles if needed
