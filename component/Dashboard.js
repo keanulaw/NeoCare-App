@@ -1,3 +1,5 @@
+// Dashboard.js
+
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
@@ -14,48 +16,68 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import theme from '../src/theme';
 import commonStyles from '../src/commonStyles';
-import BabySizeCard from './BabySizeCard';            // ← NEW IMPORT
+import BabySizeCard from './BabySizeCard'; // ← your existing component
+import CustomHeader from './CustomHeader';
 
-const Dashboard = ({ navigation }) => {
+const getTimeOfDay = () => {
+  const hr = new Date().getHours();
+  if (hr < 12) return 'Morning';
+  if (hr < 18) return 'Afternoon';
+  return 'Evening';
+};
+
+export default function Dashboard({ navigation }) {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  /* ---------------------------------------------------------------------- */
-  /*  Fetch upcoming appointments                                            */
-  /* ---------------------------------------------------------------------- */
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    const q = query(
-      collection(db, 'appointmentRequests'),
+    // Listen to bookings (not appointmentRequests)
+    const bookingsQuery = query(
+      collection(db, 'bookings'),
       where('userId', '==', user.uid),
-      where('status', 'in', ['accepted', 'pending'])
+      where('status', 'in', ['pending', 'accepted'])
     );
 
     const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const appts = snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            date: data.date ? data.date.toDate() : new Date(),
-            consultantName: data.consultantName,
-            time: data.consultationHour,
-            platform: data.platform,
-            status: data.status,
-          };
-        });
-        setAppointments(appts);
+      bookingsQuery,
+      (snapshot) => {
+        const now = new Date();
+
+        const upcoming = snapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            // convert Firestore Timestamp to JS Date
+            const baseDate = data.date?.toDate() || new Date();
+            // parse your stored hour string (e.g. "14:30")
+            const [h = 0, m = 0] = (data.hour || '').split(':').map(n => parseInt(n, 10));
+            baseDate.setHours(h, m);
+
+            return {
+              id: doc.id,
+              date: baseDate,
+              consultantName: data.consultantName || 'Unknown',
+              platform: data.platform || '',
+              status: data.status,
+            };
+          })
+          // only keep those at or after now
+          .filter(appt => appt.date >= now)
+          // sort soonest first
+          .sort((a, b) => a.date - b.date);
+
+        setAppointments(upcoming);
         setLoading(false);
       },
-      (err) => {
-        console.error('Appointment fetch error:', err);
+      (error) => {
+        console.error('Dashboard booking fetch error:', error);
         setLoading(false);
       }
     );
-    return unsub;
+
+    return () => unsub();
   }, []);
 
   const renderAppointment = ({ item }) => (
@@ -88,11 +110,11 @@ const Dashboard = ({ navigation }) => {
   );
 
   const quickAccessButtons = [
-    { id: '1', name: 'Consultants', icon: 'people', screen: 'ConsultantScreen' },
+    { id: '1', name: 'Health Professionals', icon: 'people', screen: 'ConsultantScreen' },
     { id: '2', name: 'Birth Centers', icon: 'place', screen: 'BirthingCenterLocator' },
     { id: '3', name: 'Assessment', icon: 'assessment', screen: 'Assessment' },
     { id: '4', name: 'Tracker', icon: 'track-changes', screen: 'Tracker' },
-    { id: '5', name: 'Bookings', icon: 'book-online', screen: 'Bookings' },
+    { id: '5', name: 'My Appointments', icon: 'book-online', screen: 'Bookings' },
   ];
 
   return (
@@ -103,7 +125,7 @@ const Dashboard = ({ navigation }) => {
           <View style={styles.userInfo}>
             <Text style={styles.greeting}>Good {getTimeOfDay()},</Text>
             <Text style={styles.name}>
-              {auth.currentUser ? auth.currentUser.displayName || 'User' : 'User'}
+              {auth.currentUser?.displayName || 'User'}
             </Text>
           </View>
           <TouchableOpacity
@@ -114,12 +136,12 @@ const Dashboard = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* NEW CARD */}
+        {/* Baby size card */}
         <BabySizeCard />
 
         {/* Quick Access Grid */}
         <View style={styles.gridContainer}>
-          {quickAccessButtons.map((button) => (
+          {quickAccessButtons.map(button => (
             <TouchableOpacity
               key={button.id}
               style={styles.gridButton}
@@ -145,7 +167,7 @@ const Dashboard = ({ navigation }) => {
           <FlatList
             data={appointments}
             renderItem={renderAppointment}
-            keyExtractor={(item) => item.id}
+            keyExtractor={item => item.id}
             contentContainerStyle={styles.appointmentsList}
             scrollEnabled={false}
           />
@@ -166,14 +188,7 @@ const Dashboard = ({ navigation }) => {
       </TouchableOpacity>
     </SafeAreaView>
   );
-};
-
-const getTimeOfDay = () => {
-  const hr = new Date().getHours();
-  if (hr < 12) return 'Morning';
-  if (hr < 18) return 'Afternoon';
-  return 'Evening';
-};
+}
 
 const styles = StyleSheet.create({
   safeArea:   { flex: 1, backgroundColor: theme.colors.background || '#F5F5F5' },
@@ -210,4 +225,3 @@ const styles = StyleSheet.create({
     elevation: 15, zIndex: 999,
   },
 });
-export default Dashboard;

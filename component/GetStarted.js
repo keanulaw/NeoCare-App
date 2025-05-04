@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image, Modal, ActivityIndicator } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Image,
+  Modal,
+  ActivityIndicator,
+  SafeAreaView,
+} from 'react-native';
 import MoodPopup from './MoodPopUp';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAuth } from 'firebase/auth';
@@ -8,7 +17,6 @@ import commonStyles from '../src/commonStyles';
 
 export default function GetStarted({ navigation }) {
   const [showMoodPopup, setShowMoodPopup] = useState(false);
-  const [moodData, setMoodData] = useState(null);
   const [loading, setLoading] = useState(true);
   const auth = getAuth();
   const userId = auth.currentUser?.uid;
@@ -22,55 +30,69 @@ export default function GetStarted({ navigation }) {
       alert('User ID is missing');
       return;
     }
-
     const today = new Date().toISOString().split('T')[0];
-    const lastShownDateKey = `lastMoodPopupDate_${userId}`;
-    const lastShownDate = await AsyncStorage.getItem(lastShownDateKey);
+    const key = `lastMoodPopupDate_${userId}`;
+    const last = await AsyncStorage.getItem(key);
 
-    if (lastShownDate !== today) {
+    if (last !== today) {
       setShowMoodPopup(true);
     } else {
-      navigation.navigate('HomeTabs');
+      navigation.replace('HomeTabs');
     }
   };
 
   const handleMoodSubmit = async (data) => {
-    setMoodData(data);
+    const key = `lastMoodPopupDate_${userId}`;
+    await AsyncStorage.setItem(key, new Date().toISOString().split('T')[0]);
     setShowMoodPopup(false);
-    const lastShownDateKey = `lastMoodPopupDate_${userId}`;
-    await AsyncStorage.setItem(lastShownDateKey, new Date().toISOString().split('T')[0]);
-    navigation.navigate('HomeTabs', { moodData: data });
+    navigation.replace('HomeTabs', { moodData: data });
   };
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Image source={require('../assets/logo.png')} style={styles.logo} />
-      <Text style={styles.title}>NEOCARE</Text>
-      <Text style={styles.subtitle}>TENDER CARE FOR TWO</Text>
+    <SafeAreaView style={styles.container}>
+      {/* Top: Logo + Title */}
+      <View style={styles.header}>
+        <Image source={require('../assets/logo.png')} style={styles.logo} />
+        <Text style={styles.title}>NEOCARE</Text>
+        <Text style={styles.subtitle}>Tender Care for Two</Text>
+      </View>
 
-      <TouchableOpacity style={styles.getStartedButton} onPress={handleGetStartedPress}>
-        <Text style={styles.getStartedText}>Get Started</Text>
-      </TouchableOpacity>
+      {/* Middle: Get Started */}
+      <View style={styles.middle}>
+        <TouchableOpacity
+          style={styles.getStartedButton}
+          onPress={handleGetStartedPress}
+          activeOpacity={0.8}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.getStartedText}>Get Started</Text>
+        </TouchableOpacity>
+      </View>
 
-      <TouchableOpacity style={styles.emergencyButton}>
-        <Text style={styles.buttonText}>EMERGENCY BUTTON</Text>
-      </TouchableOpacity>
+      {/* Bottom: Emergency (big, full-width) */}
+      <View style={styles.bottom}>
+        <TouchableOpacity
+          style={styles.emergencyButton}
+          onPress={() => navigation.navigate('Emergency')}
+          activeOpacity={0.7}
+          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+        >
+          <Text style={styles.emergencyText}>EMERGENCY</Text>
+        </TouchableOpacity>
+      </View>
 
-      <TouchableOpacity style={styles.chatbotButton} onPress={() => navigation.navigate('ChatBot')}>
-        <Text style={styles.chatbotButtonText}>Chat with Bot</Text>
-      </TouchableOpacity>
-
+      {/* Mood Popup */}
       <Modal
         visible={showMoodPopup}
-        transparent={true}
+        transparent
         animationType="fade"
         onRequestClose={() => setShowMoodPopup(false)}
       >
@@ -80,84 +102,87 @@ export default function GetStarted({ navigation }) {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loadingContainer: {
     ...commonStyles.screenContainer,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
     backgroundColor: '#fff',
   },
+  container: {
+    flex: 1,
+    backgroundColor: '#fafafa',
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+  },
+  header: {
+    alignItems: 'center',
+    marginTop: 50,
+  },
   logo: {
-    width: 150,
-    height: 150,
-    marginBottom: 20,
+    width: 140,
+    height: 140,
+    marginBottom: 16,
     resizeMode: 'contain',
   },
   title: {
-    fontSize: 36,
-    color: '#D47FA6',
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 32,
+    color: theme.colors.primary,
+    fontWeight: '700',
   },
   subtitle: {
-    fontSize: 18,
-    color: '#A9A9A9',
-    marginBottom: 40,
+    fontSize: 16,
+    color: '#666',
+    marginTop: 4,
+  },
+  middle: {
+    alignItems: 'center',
   },
   getStartedButton: {
-    backgroundColor: theme.colors.primary || '#D47FA6',
-    paddingVertical: 15,
-    paddingHorizontal: 40,
+    width: '80%',
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 18,
     borderRadius: 30,
-    marginBottom: 20,
-    elevation: 5,
+    elevation: 4,
+    alignItems: 'center',
   },
   getStartedText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  bottom: {
+    alignItems: 'center',
+    marginBottom: 30,
   },
   emergencyButton: {
-    backgroundColor: '#FF6F61',
-    paddingVertical: 15,
-    paddingHorizontal: 40,
+    width: '100%',
+    backgroundColor: '#D32F2F',
+    paddingVertical: 22,
     borderRadius: 30,
-    marginBottom: 20,
-    elevation: 5,
+    elevation: 6,
+    alignItems: 'center',
   },
-  buttonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  chatbotButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    marginBottom: 20,
-    elevation: 5,
-  },
-  chatbotButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
+  emergencyText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 20,
     width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
   },
 });
