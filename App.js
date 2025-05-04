@@ -30,6 +30,7 @@ import {
   listenForNotifications,
   configureAndroidChannel
 } from './component/Notifications'; // Updated path to Notifications.js
+import DoctorsScreen from './component/DoctorsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -165,6 +166,10 @@ function App() {
           options={{ title: 'Pregnancy Tracker' }}
         />
         <Stack.Screen name="ChatBot" component={ChatBotScreen} options={{ title: 'Chat Bot' }} />
+        <Stack.Screen
+          name="DoctorsScreen"
+          component={DoctorsScreen}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
