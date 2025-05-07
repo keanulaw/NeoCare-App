@@ -55,8 +55,8 @@ function HomeTabs() {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Calendar') {
-            iconName = focused ? 'calendar' : 'calendar-outline';
+          } else if (route.name === 'Appointments') {
+            iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'Message') {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           } else if (route.name === 'Profile') {
@@ -64,15 +64,17 @@ function HomeTabs() {
           }
 
           return (
-            <AnimatedTabIcon name={iconName} focused={focused} size={size} color={color} />
+            <AnimatedTabIcon
+              name={iconName}
+              size={size}
+              color={color}
+              focused={focused}
+            />
           );
         },
         tabBarActiveTintColor: '#D47FA6',
         tabBarInactiveTintColor: '#888',
-        tabBarLabelStyle: {
-          fontSize: 12,
-          marginBottom: 2,
-        },
+        tabBarLabelStyle: { fontSize: 12, marginBottom: 2 },
         headerShown: false,
         tabBarStyle: {
           position: 'absolute',
@@ -82,8 +84,8 @@ function HomeTabs() {
           height: 60,
           backgroundColor: '#fff',
           borderRadius: 12,
-          elevation: 10, // Android shadow
-          shadowColor: '#000', // iOS shadow
+          elevation: 10,
+          shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.3,
           shadowRadius: 5,
@@ -92,7 +94,7 @@ function HomeTabs() {
       })}
     >
       <Tab.Screen name="Home" component={Dashboard} />
-      <Tab.Screen name="Calendar" component={BookingsScreen} />
+      <Tab.Screen name="Appointments" component={BookingsScreen} />
       <Tab.Screen name="Message" component={MessageScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

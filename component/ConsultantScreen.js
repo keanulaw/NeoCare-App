@@ -58,6 +58,7 @@ export default function ConsultantScreen({ navigation }) {
   }, []);
 
   const filtered = consultants.filter(c =>
+    c.hourlyRate != null &&
     c.name?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -69,7 +70,7 @@ export default function ConsultantScreen({ navigation }) {
     >
       <View style={styles.card}>
         <ExpoImage
-          source={{ uri: item.profilePhoto }}             // <-- changed here
+          source={{ uri: item.profilePhoto }}
           style={styles.image}
           contentFit="cover"
           transition={300}
@@ -80,9 +81,11 @@ export default function ConsultantScreen({ navigation }) {
           <Text style={styles.rating}>
             {item.avgRating != null ? `⭐ ${item.avgRating}` : 'No ratings yet'}
           </Text>
-          {item.hourlyRate != null && (
-            <Text style={styles.rate}>₱{item.hourlyRate}/hr</Text>
-          )}
+          <Text style={styles.rate}>
+            {item.hourlyRate != null
+              ? `₱${item.hourlyRate}/hr`
+              : 'Rate to be announced'}
+          </Text>
         </View>
       </View>
     </TouchableOpacity>

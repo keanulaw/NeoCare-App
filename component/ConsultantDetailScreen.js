@@ -183,12 +183,6 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
             {average != null ? `⭐ ${average}` : 'No ratings yet'}
           </Text>
         </View>
-        <View style={styles.detailCard}>
-          <Text style={styles.sectionTitle}>Your Rating</Text>
-          <Text style={[styles.sectionContent, { fontSize: 18 }]}>
-            {userRating != null ? `⭐ ${userRating}` : 'You have not rated this doctor.'}
-          </Text>
-        </View>
 
         {/* Actions */}
         <View style={styles.buttonContainer}>

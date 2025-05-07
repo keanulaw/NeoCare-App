@@ -121,7 +121,7 @@ export default function BookingsScreen({ navigation }) {
     try {
       await deleteDoc(doc(db, 'bookings', booking.id));
     } catch (e) {
-      console.error(e);
+      console.error('Error cancelling booking:', e);
       Alert.alert('Error', 'Could not cancel appointment.');
     }
   };

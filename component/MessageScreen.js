@@ -1,3 +1,5 @@
+// src/screens/MessageScreen.js
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -33,7 +35,6 @@ const MessageScreen = () => {
   const navigation = useNavigation();
   const user = auth.currentUser;
 
-  // Subscribe to chats where current user is a participant
   const subscribeChats = useCallback(
     userId => {
       const q = query(
@@ -49,25 +50,43 @@ const MessageScreen = () => {
             const convs = await Promise.all(
               snapshot.docs.map(async chatDoc => {
                 const chat = chatDoc.data();
-                // Find the other participant
                 const otherId = chat.participants.find(id => id !== userId);
-                // Fetch that user's profile
-                let name = 'Unknown';
+
+                // Try fetching from 'users'
+                let name = '';
                 let avatar = null;
                 try {
                   const userSnap = await getDoc(doc(db, 'users', otherId));
                   if (userSnap.exists()) {
                     const u = userSnap.data();
-                    name = u.fullName;
-                    avatar = u.photoURL;
+                    name = u.fullName || u.displayName || u.email || '';
+                    avatar = u.photoURL || null;
                   }
                 } catch (e) {
-                  console.warn('Profile fetch error', e);
+                  console.warn('User fetch error', e);
                 }
 
-                // Fetch the last message if not stored on chat doc
+                // If still no name, try 'consultants'
+                if (!name) {
+                  try {
+                    const consSnap = await getDoc(doc(db, 'consultants', otherId));
+                    if (consSnap.exists()) {
+                      const c = consSnap.data();
+                      name = c.name || '';
+                      avatar = c.profilePhoto || avatar;
+                    }
+                  } catch (e) {
+                    console.warn('Consultant fetch error', e);
+                  }
+                }
+
+                // Final fallback to ID
+                if (!name) name = otherId;
+
+                // Fetch last message if needed
                 let lastMessage = chat.lastMessageText || '';
-                let timestamp = chat.lastUpdated?.toDate() || chat.createdAt?.toDate();
+                let timestamp =
+                  chat.lastUpdated?.toDate() || chat.createdAt?.toDate();
                 if (!lastMessage) {
                   const msgsSnap = await getDocs(
                     query(
@@ -109,7 +128,6 @@ const MessageScreen = () => {
     []
   );
 
-  // Initial subscription
   useEffect(() => {
     if (!user) {
       navigation.navigate('Login');
@@ -119,13 +137,11 @@ const MessageScreen = () => {
     return () => unsub();
   }, [navigation, subscribeChats, user]);
 
-  // Pull-to-refresh handler (re-runs the subscription)
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     if (user) subscribeChats(user.uid);
   }, [user, subscribeChats]);
 
-  // Navigate into the specific chat screen
   const handleChatClick = chat => {
     navigation.navigate('Chat', {
       chatDetails: {
@@ -135,11 +151,8 @@ const MessageScreen = () => {
     });
   };
 
-  // Format the JS Date timestamp
   const formatTime = ts =>
-    ts
-      ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : '';
+    ts ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 
   if (loading) {
     return (

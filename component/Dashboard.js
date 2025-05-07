@@ -1,4 +1,4 @@
-// Dashboard.js
+// src/screens/Dashboard.js
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -12,11 +12,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { db, auth } from '../firebaseConfig';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, query, where, onSnapshot } from 'firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import theme from '../src/theme';
 import commonStyles from '../src/commonStyles';
-import BabySizeCard from './BabySizeCard'; // ← your existing component
+import BabySizeCard from './BabySizeCard';
 import CustomHeader from './CustomHeader';
 
 const getTimeOfDay = () => {
@@ -27,14 +27,36 @@ const getTimeOfDay = () => {
 };
 
 export default function Dashboard({ navigation }) {
+  const [fullName, setFullName] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch the user's fullName from Firestore
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
-    // Listen to bookings (not appointmentRequests)
+    const userDocRef = doc(db, 'users', user.uid);
+    getDoc(userDocRef)
+      .then(docSnap => {
+        if (docSnap.exists() && docSnap.data().fullName) {
+          setFullName(docSnap.data().fullName);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching user fullName:', err);
+      });
+  }, []);
+
+  // Listen for upcoming bookings
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) {
+      setAppointments([]);
+      setLoading(false);
+      return;
+    }
+
     const bookingsQuery = query(
       collection(db, 'bookings'),
       where('userId', '==', user.uid),
@@ -43,16 +65,15 @@ export default function Dashboard({ navigation }) {
 
     const unsub = onSnapshot(
       bookingsQuery,
-      (snapshot) => {
+      snapshot => {
         const now = new Date();
-
         const upcoming = snapshot.docs
           .map(doc => {
             const data = doc.data();
-            // convert Firestore Timestamp to JS Date
             const baseDate = data.date?.toDate() || new Date();
-            // parse your stored hour string (e.g. "14:30")
-            const [h = 0, m = 0] = (data.hour || '').split(':').map(n => parseInt(n, 10));
+            const [h = 0, m = 0] = (data.hour || '')
+              .split(':')
+              .map(n => parseInt(n, 10));
             baseDate.setHours(h, m);
 
             return {
@@ -63,16 +84,16 @@ export default function Dashboard({ navigation }) {
               status: data.status,
             };
           })
-          // only keep those at or after now
           .filter(appt => appt.date >= now)
-          // sort soonest first
           .sort((a, b) => a.date - b.date);
 
         setAppointments(upcoming);
         setLoading(false);
       },
-      (error) => {
+      error => {
         console.error('Dashboard booking fetch error:', error);
+        if (error.code === 'permission-denied') unsub();
+        setAppointments([]);
         setLoading(false);
       }
     );
@@ -81,12 +102,7 @@ export default function Dashboard({ navigation }) {
   }, []);
 
   const renderAppointment = ({ item }) => (
-    <TouchableOpacity
-      style={styles.appointmentCard}
-      onPress={() =>
-        navigation.navigate('AppointmentDetails', { appointment: item })
-      }
-    >
+    <View style={styles.appointmentCard}>
       <View style={styles.appointmentContent}>
         <Text style={styles.appointmentDate}>
           {item.date.toLocaleDateString('en-PH', {
@@ -102,11 +118,13 @@ export default function Dashboard({ navigation }) {
             minute: '2-digit',
           })}
         </Text>
-        <Text style={styles.appointmentDetails}>With Dr. {item.consultantName}</Text>
+        <Text style={styles.appointmentDetails}>
+          With Dr. {item.consultantName}
+        </Text>
         <Text style={styles.appointmentPlatform}>{item.platform}</Text>
       </View>
       <Icon name="chevron-right" size={24} color="#D47FA6" />
-    </TouchableOpacity>
+    </View>
   );
 
   const quickAccessButtons = [
@@ -119,13 +137,15 @@ export default function Dashboard({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <CustomHeader title="Dashboard" navigation={navigation} />
+
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Header */}
+        {/* Greeting */}
         <View style={styles.header}>
           <View style={styles.userInfo}>
             <Text style={styles.greeting}>Good {getTimeOfDay()},</Text>
             <Text style={styles.name}>
-              {auth.currentUser?.displayName || 'User'}
+              {fullName || auth.currentUser?.displayName || 'User'}
             </Text>
           </View>
           <TouchableOpacity
@@ -136,19 +156,18 @@ export default function Dashboard({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Baby size card */}
         <BabySizeCard />
 
-        {/* Quick Access Grid */}
+        {/* Quick Access */}
         <View style={styles.gridContainer}>
-          {quickAccessButtons.map(button => (
+          {quickAccessButtons.map(btn => (
             <TouchableOpacity
-              key={button.id}
+              key={btn.id}
               style={styles.gridButton}
-              onPress={() => navigation.navigate(button.screen)}
+              onPress={() => navigation.navigate(btn.screen)}
             >
-              <Icon name={button.icon} size={28} color="#D47FA6" />
-              <Text style={styles.gridButtonText}>{button.name}</Text>
+              <Icon name={btn.icon} size={28} color="#D47FA6" />
+              <Text style={styles.gridButtonText}>{btn.name}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -162,7 +181,7 @@ export default function Dashboard({ navigation }) {
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color={theme.colors.primary || '#D47FA6'} />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         ) : appointments.length > 0 ? (
           <FlatList
             data={appointments}
@@ -174,12 +193,13 @@ export default function Dashboard({ navigation }) {
         ) : (
           <View style={styles.noAppointments}>
             <Icon name="event-available" size={40} color="#D47FA6" />
-            <Text style={styles.noAppointmentsText}>No upcoming appointments</Text>
+            <Text style={styles.noAppointmentsText}>
+              No upcoming appointments
+            </Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Floating chat bot button */}
       <TouchableOpacity
         style={styles.chatBotButton}
         onPress={() => navigation.navigate('ChatBot')}
@@ -191,22 +211,23 @@ export default function Dashboard({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea:   { flex: 1, backgroundColor: theme.colors.background || '#F5F5F5' },
-  container:  { padding: 15, paddingBottom: 80 },
-  header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  userInfo:   { flex: 1 },
-  greeting:   { fontSize: 18, color: '#666' },
-  name:       { fontSize: 24, fontWeight: 'bold', color: '#D47FA6' },
+  safeArea: { flex: 1, backgroundColor: theme.colors.background },
+  container: { padding: 15, paddingBottom: 80 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  userInfo: { flex: 1 },
+  greeting: { fontSize: 18, color: '#666' },
+  name: { fontSize: 24, fontWeight: 'bold', color: '#D47FA6' },
   notificationIcon: { padding: 10 },
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginVertical: 15 },
   gridButton: {
-    width: '30%', backgroundColor: 'white', borderRadius: 15, alignItems: 'center',
-    justifyContent: 'center', padding: 15, marginVertical: 8, elevation: 2,
+    width: '30%', backgroundColor: 'white', borderRadius: 15,
+    alignItems: 'center', justifyContent: 'center', padding: 15,
+    marginVertical: 8, elevation: 2,
   },
   gridButtonText: { fontSize: 12, color: '#D47FA6', textAlign: 'center', marginTop: 8, fontWeight: '500' },
-  sectionHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 15 },
-  sectionTitle:   { fontSize: 20, fontWeight: 'bold', color: '#D47FA6' },
-  viewAll:        { color: '#FF6F61', fontSize: 14, fontWeight: '500' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 15 },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#D47FA6' },
+  viewAll: { color: '#FF6F61', fontSize: 14, fontWeight: '500' },
   appointmentsList: { paddingBottom: 20 },
   appointmentCard: {
     backgroundColor: 'white', borderRadius: 15, padding: 20, marginVertical: 8,

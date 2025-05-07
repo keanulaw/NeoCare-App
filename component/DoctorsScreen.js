@@ -1,106 +1,108 @@
+// src/screens/DoctorsScreen.js
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
+  TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
+  StyleSheet
 } from 'react-native';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import CustomHeader from './CustomHeader';
 
+const theme = {
+  colors: {
+    primary: '#D47FA6',
+    background: '#FFF4E6',
+    text: '#333',
+    subtext: '#666',
+  }
+};
+
 export default function DoctorsScreen({ route, navigation }) {
-  // pull in whichever params you passed
-  const {
-    birthCenterId,
-    birthCenterName,
-    clinicId,
-    clinicName,
-  } = route.params;
+  const { centerId, centerName } = route.params;
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // choose the “center” id & name
-  const centerId   = birthCenterId || clinicId;
-  const centerName = birthCenterName || clinicName;
-
-  const [doctors,  setDoctors]  = useState([]);
-  const [loading,  setLoading]  = useState(true);
-
-  // hide RN header, show our CustomHeader instead
+  // hide native header
   useEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
-  // fetch only “accepted” consultants
   useEffect(() => {
     (async () => {
       try {
         const colRef = collection(db, 'consultants');
 
-        // first try matching by birthCenterName
+        // 1️⃣ try matching by birthCenterName
         let q = query(
           colRef,
           where('approvalStatus', '==', 'accepted'),
           where('birthCenterName', '==', centerName)
         );
+        let snap = await getDocs(q);
 
-        const snap = await getDocs(q);
-
-        // if none found by name, fall back to clinicId:
+        // 2️⃣ if none found, fall back to clinicId
         if (snap.empty && centerId) {
           q = query(
             colRef,
             where('approvalStatus', '==', 'accepted'),
-            where('clinicId',      '==', centerId)
+            where('clinicId', '==', centerId)
           );
+          snap = await getDocs(q);
         }
 
-        const finalSnap = snap.empty ? await getDocs(q) : snap;
-        const docs       = finalSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setDoctors(docs);
+        setDoctors(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
-        console.error('Failed to fetch doctors:', err);
+        console.error('Fetch doctors failed', err);
       } finally {
         setLoading(false);
       }
     })();
-  }, [centerName, centerId]);
+  }, [centerId, centerName]);
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#D47FA6" />
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomHeader
-        title={centerName}
-        navigation={navigation}
-        backButton={true}
-      />
+      <CustomHeader title={centerName} navigation={navigation} backButton />
 
       {doctors.length === 0 ? (
         <View style={styles.center}>
-          <Text>No doctors found for this center.</Text>
+          <Text style={styles.emptyText}>
+            No doctors found for this center.
+          </Text>
         </View>
       ) : (
         <FlatList
           data={doctors}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.name}>
-                {item.name || item.email}
-              </Text>
-              <Text style={styles.specialty}>
-                {item.specialty || ''}
-              </Text>
-            </View>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() =>
+                navigation.navigate('ConsultantDetail', { consultantId: item.id })
+              }
+            >
+              <Text style={styles.name}>{item.name || item.email}</Text>
+              {item.specialty && (
+                <Text style={styles.specialty}>{item.specialty}</Text>
+              )}
+              {item.hourlyRate != null && (
+                <Text style={styles.rate}>₱{item.hourlyRate}/hr</Text>
+              )}
+            </TouchableOpacity>
           )}
+          contentContainerStyle={{ paddingBottom: 20 }}
         />
       )}
     </SafeAreaView>
@@ -108,15 +110,23 @@ export default function DoctorsScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF4E6' },
+  container: { flex: 1, backgroundColor: theme.colors.background },
   center:    { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { color: theme.colors.subtext, fontSize: 16 },
+
   card: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    margin: 10,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
     elevation: 3,
   },
-  name:      { fontSize: 18, fontWeight: 'bold', color: '#D47FA6' },
-  specialty: { fontSize: 14, color: '#666', marginTop: 4 },
+  name:      { fontSize: 18, fontWeight: '600', color: theme.colors.primary },
+  specialty: { fontSize: 14, color: theme.colors.subtext, marginTop: 4 },
+  rate:      { marginTop: 6, fontSize: 14, color: theme.colors.subtext, fontWeight: '500' },
 });
