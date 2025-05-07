@@ -91,11 +91,12 @@ const BirthingCenterLocator = ({ navigation }) => {
 
   // 4️⃣ Filter registered centers by name
   const filteredCenters = useMemo(() => {
-    return registeredCenters.filter(center =>
-      center.birthCenterName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-    );
+    const term = searchTerm.trim().toLowerCase();
+    return registeredCenters.filter(center => {
+      // if birthCenterName is missing, default to empty string
+      const name = center.birthCenterName || '';
+      return name.toLowerCase().includes(term);
+    });
   }, [searchTerm, registeredCenters]);
 
   // 5️⃣ Filter nearby Places results by distance & name
