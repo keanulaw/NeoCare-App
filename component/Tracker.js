@@ -10,7 +10,12 @@ import {
   ScrollView
 } from "react-native";
 import { db, auth } from "../firebaseConfig";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot
+} from "firebase/firestore";
 import theme from "../src/theme";
 import CustomHeader from "./CustomHeader";
 
@@ -25,58 +30,52 @@ export default function Tracker({ navigation }) {
   const [noteSummaryLoading, setNoteSummaryLoading] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // ─── Fetch notes & build doctor list ─────────────────────────────────────────
+  // ─── Listen in real time to all notes for this client user ─────────────────────────
   useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) return;
+    const user = auth.currentUser;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-        // find client record
-        const clientQ = query(
-          collection(db, "clients"),
-          where("userId", "==", user.uid)
-        );
-        const clientSnap = await getDocs(clientQ);
-        if (clientSnap.empty) {
-          setNotes([]);
-          return;
-        }
-        const clientId = clientSnap.docs[0].id;
+    // listen in real time to all notes for this client user
+    const notesQ = query(
+      collection(db, "consultationNotes"),
+      where("clientUserId", "==", user.uid)
+    );
 
-        // fetch notes for this client
-        const notesQ = query(
-          collection(db, "consultationNotes"),
-          where("clientId", "==", clientId)
-        );
-        const notesSnap = await getDocs(notesQ);
-        const allNotes = notesSnap.docs
-          .map((d) => ({
-            id: d.id,
-            consultantId: d.data().consultantId,
-            consultantName: d.data().consultantName,
-            ...d.data(),
-            createdAt: d.data().createdAt?.toDate() || new Date()
-          }))
-          .filter((n) => n.consultantId && n.consultantName);
+    const unsubscribe = onSnapshot(
+      notesQ,
+      snapshot => {
+        const allNotes = snapshot.docs
+          .map(d => {
+            const data = d.data();
+            return {
+              id: d.id,
+              ...data,
+              createdAt: data.createdAt?.toDate() ?? new Date(),
+              consultantId: data.consultantId,
+              consultantName: data.consultantName,
+            };
+          })
+          .filter(n => n.consultantId && n.consultantName);
 
         setNotes(allNotes);
 
-        // derive unique doctors
-        const unique = {};
-        allNotes.forEach((n) => {
-          unique[n.consultantId] = n.consultantName;
-        });
-        setDoctors(
-          Object.entries(unique).map(([id, name]) => ({ id, name }))
-        );
-      } catch (err) {
-        console.error("Tracker error:", err);
-      } finally {
+        // build your unique-doctor list
+        const map = {};
+        allNotes.forEach(n => (map[n.consultantId] = n.consultantName));
+        setDoctors(Object.entries(map).map(([id, name]) => ({ id, name })));
+
+        setLoading(false);
+      },
+      err => {
+        console.error("Tracker snapshot error:", err);
         setLoading(false);
       }
-    };
-    fetchAll();
+    );
+
+    return () => unsubscribe();
   }, []);
 
   // ─── Fetch per‑note AI insights ───────────────────────────────────────────────
