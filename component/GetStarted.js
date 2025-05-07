@@ -8,17 +8,20 @@ import {
   Modal,
   ActivityIndicator,
   SafeAreaView,
+  Alert,
+  Platform,
 } from 'react-native';
 import MoodPopup from './MoodPopUp';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAuth } from 'firebase/auth';
+import { app } from '../firebaseConfig';               // your Firebase init
 import theme from '../src/theme';
 import commonStyles from '../src/commonStyles';
 
 export default function GetStarted({ navigation }) {
   const [showMoodPopup, setShowMoodPopup] = useState(false);
   const [loading, setLoading] = useState(true);
-  const auth = getAuth();
+  const auth = getAuth(app);
   const userId = auth.currentUser?.uid;
 
   useEffect(() => {
@@ -48,6 +51,35 @@ export default function GetStarted({ navigation }) {
     navigation.replace('HomeTabs', { moodData: data });
   };
 
+  const handleEmergencyPress = async () => {
+    // Adjust this to where your Node server really is!
+    const baseURL = 
+      Platform.OS === 'android'
+        ? 'http://10.0.2.2:3000'
+        : 'http://localhost:3000';
+    // Uncomment the line below if on a real device pointing at your PC's IP:
+    // const baseURL = 'http://192.168.1.10:3000';
+
+    try {
+      console.log('👉 Sending emergency to', `${baseURL}/api/emergency`);
+      const resp = await fetch(`${baseURL}/api/emergency`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      console.log('⏳ status:', resp.status);
+      const json = await resp.json();
+      console.log('📥 body:', json);
+      if (!resp.ok) {
+        throw new Error(json.error || `HTTP ${resp.status}`);
+      }
+      Alert.alert('Alert sent', 'Your emergency contact has been notified.');
+    } catch (err) {
+      console.error('Emergency SMS error:', err);
+      Alert.alert('Error', err.message);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -60,7 +92,10 @@ export default function GetStarted({ navigation }) {
     <SafeAreaView style={styles.container}>
       {/* Top: Logo + Title */}
       <View style={styles.header}>
-        <Image source={require('../assets/logo.png')} style={styles.logo} />
+        <Image
+          source={require('../assets/logo.png')}
+          style={styles.logo}
+        />
         <Text style={styles.title}>NEOCARE</Text>
         <Text style={styles.subtitle}>Tender Care for Two</Text>
       </View>
@@ -77,11 +112,11 @@ export default function GetStarted({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Bottom: Emergency (big, full-width) */}
+      {/* Bottom: Emergency */}
       <View style={styles.bottom}>
         <TouchableOpacity
           style={styles.emergencyButton}
-          onPress={() => navigation.navigate('Emergency')}
+          onPress={handleEmergencyPress}
           activeOpacity={0.7}
           hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
         >

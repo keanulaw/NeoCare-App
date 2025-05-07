@@ -6,134 +6,272 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  SafeAreaView,
+  Image
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  getDoc,
+  getDocs,
+  limit,
+  doc
+} from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
+import CustomHeader from './CustomHeader';
+import theme from '../src/theme';
 
 const MessageScreen = () => {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
+  const user = auth.currentUser;
 
-  const subscribeChats = (userId) => {
-    const chatsRef = collection(db, 'chats');
-    const q = query(
-      chatsRef,
-      where('participants', 'array-contains', userId),
-      orderBy('createdAt', 'desc')
-    );
-    return onSnapshot(q, (snapshot) => {
-      const convs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setConversations(convs);
-      setLoading(false);
-      setRefreshing(false);
-    });
-  };
+  // Subscribe to chats where current user is a participant
+  const subscribeChats = useCallback(
+    userId => {
+      const q = query(
+        collection(db, 'chats'),
+        where('participants', 'array-contains', userId),
+        orderBy('createdAt', 'desc')
+      );
 
+      return onSnapshot(
+        q,
+        snapshot => {
+          (async () => {
+            const convs = await Promise.all(
+              snapshot.docs.map(async chatDoc => {
+                const chat = chatDoc.data();
+                // Find the other participant
+                const otherId = chat.participants.find(id => id !== userId);
+                // Fetch that user's profile
+                let name = 'Unknown';
+                let avatar = null;
+                try {
+                  const userSnap = await getDoc(doc(db, 'users', otherId));
+                  if (userSnap.exists()) {
+                    const u = userSnap.data();
+                    name = u.fullName;
+                    avatar = u.photoURL;
+                  }
+                } catch (e) {
+                  console.warn('Profile fetch error', e);
+                }
+
+                // Fetch the last message if not stored on chat doc
+                let lastMessage = chat.lastMessageText || '';
+                let timestamp = chat.lastUpdated?.toDate() || chat.createdAt?.toDate();
+                if (!lastMessage) {
+                  const msgsSnap = await getDocs(
+                    query(
+                      collection(db, 'chats', chatDoc.id, 'messages'),
+                      orderBy('createdAt', 'desc'),
+                      limit(1)
+                    )
+                  );
+                  if (!msgsSnap.empty) {
+                    const m = msgsSnap.docs[0].data();
+                    lastMessage = m.text;
+                    timestamp = m.createdAt.toDate();
+                  }
+                }
+
+                return {
+                  id: chatDoc.id,
+                  otherId,
+                  name,
+                  avatar,
+                  lastMessage,
+                  timestamp
+                };
+              })
+            );
+
+            setConversations(convs);
+            setLoading(false);
+            setRefreshing(false);
+          })();
+        },
+        error => {
+          console.error('Chat subscription error', error);
+          setLoading(false);
+          setRefreshing(false);
+        }
+      );
+    },
+    []
+  );
+
+  // Initial subscription
   useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged(user => {
-      if (!user) {
-        console.warn('No user logged in.');
-        navigation.navigate('Login');
-        return;
-      }
-      const unsubscribeChats = subscribeChats(user.uid);
-      return () => unsubscribeChats();
-    });
-    return () => unsubscribeAuth();
-  }, [navigation]);
+    if (!user) {
+      navigation.navigate('Login');
+      return;
+    }
+    const unsub = subscribeChats(user.uid);
+    return () => unsub();
+  }, [navigation, subscribeChats, user]);
 
+  // Pull-to-refresh handler (re-runs the subscription)
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    const user = auth.currentUser;
-    if (user) {
-      subscribeChats(user.uid);
-    }
-  }, []);
+    if (user) subscribeChats(user.uid);
+  }, [user, subscribeChats]);
 
-  const handleChatClick = (chat) => {
-    const chatDetails = {
-      chatId: chat.id,
-      participants: chat.participants,
-    };
-    navigation.navigate('Chat', { chatDetails });
+  // Navigate into the specific chat screen
+  const handleChatClick = chat => {
+    navigation.navigate('Chat', {
+      chatDetails: {
+        chatId: chat.id,
+        participants: [user.uid, chat.otherId],
+      }
+    });
   };
 
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return '';
-    const date = new Date(timestamp.seconds * 1000);
-    return date.toLocaleTimeString();
-  };
+  // Format the JS Date timestamp
+  const formatTime = ts =>
+    ts
+      ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#D47FA6" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Messages</Text>
+    <SafeAreaView style={styles.container}>
+      <CustomHeader title="Messages" navigation={navigation} />
+
       <FlatList
         data={conversations}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.chatItem} onPress={() => handleChatClick(item)}>
-            <View style={styles.chatInfo}>
-              <Text style={styles.chatTitle}>{item.parentName || 'Chat'}</Text>
-              <Text style={styles.lastMessage} numberOfLines={1}>
-                {item.lastMessage || 'No messages yet'}
-              </Text>
-            </View>
-            <Text style={styles.timestamp}>{formatTimestamp(item.createdAt)}</Text>
-          </TouchableOpacity>
-        )}
-        contentContainerStyle={conversations.length === 0 && styles.emptyContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No conversations yet. Start chatting!</Text>
+            <Text style={styles.emptyText}>
+              No conversations yet. Start chatting!
+            </Text>
           </View>
         }
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.chatItem}
+            onPress={() => handleChatClick(item)}
+          >
+            {item.avatar ? (
+              <Image source={{ uri: item.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarPlaceholderText}>
+                  {item.name.charAt(0)}
+                </Text>
+              </View>
+            )}
+            <View style={styles.chatInfo}>
+              <Text style={styles.chatName}>{item.name}</Text>
+              <Text style={styles.lastMessage} numberOfLines={1}>
+                {item.lastMessage}
+              </Text>
+            </View>
+            <Text style={styles.timestamp}>
+              {formatTime(item.timestamp)}
+            </Text>
+          </TouchableOpacity>
+        )}
+        contentContainerStyle={
+          conversations.length === 0 && styles.flatEmptyContainer
+        }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF4E6', padding: 10 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginVertical: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: '#FFF4E6',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   chatItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    marginBottom: 10,
+    padding: 12,
+    marginHorizontal: 12,
+    marginVertical: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    elevation: 1,
   },
-  chatInfo: { flex: 1 },
-  chatTitle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  lastMessage: { fontSize: 14, color: '#666', marginTop: 4 },
-  timestamp: { fontSize: 12, color: '#999' },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
+  },
+  avatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
+    backgroundColor: '#DDD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarPlaceholderText: {
+    color: '#555',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  chatInfo: {
+    flex: 1,
+  },
+  chatName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#999',
+    marginLeft: 8,
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 15,
+    padding: 20,
   },
-  emptyText: { fontSize: 18, color: '#666', textAlign: 'center' },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+  },
+  flatEmptyContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
 });
 
 export default MessageScreen;

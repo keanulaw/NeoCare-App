@@ -1,19 +1,81 @@
-import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, Alert, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
-import { db, auth } from '../firebaseConfig'; // Use the already-initialized instance
-import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
+// src/screens/ConsultantDetailScreen.js
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  Alert,
+  TouchableOpacity,
+  ScrollView,
+  SafeAreaView,
+  ActivityIndicator
+} from 'react-native';
+import { db, auth } from '../firebaseConfig';
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  writeBatch,
+  setDoc,
+  increment,
+  serverTimestamp
+} from 'firebase/firestore';
 import { query, where } from 'firebase/firestore';
-import CustomHeader from './CustomHeader'; // Import the CustomHeader
+import CustomHeader from './CustomHeader';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import commonStyles from '../src/commonStyles';
+import theme from '../src/theme';
 
 const ConsultantDetailScreen = ({ route, navigation }) => {
-  const { consultant } = route.params;
-  const [rating, setRating] = useState(0);
+  const { consultantId } = route.params;
+  const [consultant, setConsultant] = useState(null);
+  const [average, setAverage] = useState(null);
+  const [userRating, setUserRating] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Ensure consultant has necessary fields
-  if (!consultant.id || !consultant.userId) {
-    console.error("Consultant data is incomplete:", consultant);
-    return null; // Or handle the error appropriately
+  useEffect(() => {
+    const loadAll = async () => {
+      try {
+        const cref = doc(db, 'consultants', consultantId);
+        const snapC = await getDoc(cref);
+        if (snapC.exists()) setConsultant({ id: snapC.id, ...snapC.data() });
+
+        const bq = query(
+          collection(db, 'bookings'),
+          where('consultantId', '==', consultantId),
+          where('rating', '>', 0)
+        );
+        const bSnap = await getDocs(bq);
+
+        let sum = 0, count = 0, mine = null;
+        bSnap.docs.forEach(d => {
+          const data = d.data();
+          sum += data.rating;
+          count++;
+          if (data.userId === auth.currentUser?.uid) {
+            mine = data.rating;
+          }
+        });
+
+        setAverage(count ? (sum / count).toFixed(1) : null);
+        setUserRating(mine);
+      } catch (e) {
+        console.error('Detail fetch failed', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAll();
+  }, [consultantId]);
+
+  if (loading) {
+    return <ActivityIndicator style={styles.loader} />;
+  }
+  if (!consultant) {
+    return <Text style={styles.errorText}>Unable to load consultant.</Text>;
   }
 
   const handleMakeAppointment = () => {
@@ -25,9 +87,7 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
   };
 
   const handleChatNavigation = async () => {
-    console.log("Chat with Consultant button pressed.");
     try {
-      // Check if a chat already exists
       const participants = [auth.currentUser.uid, consultant.userId].sort();
       const chatsRef = collection(db, "chats");
       const q = query(chatsRef, where("participants", "==", participants));
@@ -47,7 +107,6 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
         chatId = newChatRef.id;
       }
 
-      // Navigate to ChatScreen with chatId and consultant details
       navigation.navigate('Chat', { chatDetails: { chatId, consultant } });
     } catch (error) {
       console.error("Error navigating to chat:", error);
@@ -55,42 +114,16 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
     }
   };
 
-  // Rating submission function.
-  const handleRatingSubmit = async () => {
-    if (!auth.currentUser) {
-      Alert.alert("Not Logged In", "Please log in to rate the consultant.");
-      return;
-    }
-    if (rating <= 0) {
-      Alert.alert("No Rating", "Please select a rating before submitting.");
-      return;
-    }
-    try {
-      // Create or update the rating document. Using a composite key to ensure one rating per user.
-      const ratingDocId = consultant.id + '_' + auth.currentUser.uid;
-      await setDoc(doc(db, 'ratings', ratingDocId), {
-        consultantId: consultant.id,
-        userId: auth.currentUser.uid,
-        rating: rating,
-        createdAt: new Date(),
-      });
-      Alert.alert("Thank you!", "Your rating has been submitted.");
-    } catch (err) {
-      console.error("Error submitting rating:", err);
-      Alert.alert("Error", "Failed to submit rating. Please try again later.");
-    }
-  };
-
-  // Helper function to format array fields for display
-  const formatArray = (arr) => Array.isArray(arr) ? arr.join(', ') : arr;
+  const formatArray = arr => Array.isArray(arr) ? arr.join(', ') : arr;
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomHeader title="Details" />
+      <CustomHeader title="Consultant Details" />
       <ScrollView>
+        {/* Profile */}
         <View style={styles.profileContainer}>
           <Image
-            source={{ uri: consultant.photoUrl }}
+            source={{ uri: consultant.profilePhoto }}         // <-- and here
             style={styles.profileImage}
           />
           <Text style={styles.name}>Dr. {consultant.name}</Text>
@@ -113,10 +146,12 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
         {/* Location Section */}
         <View style={styles.detailCard}>
           <Text style={styles.sectionTitle}>Location</Text>
-          <Text style={styles.sectionContent}>{consultant.hospitalAddress}</Text>
+          <Text style={styles.sectionContent}>
+            {consultant.birthCenterAddress || 'No location provided'}
+          </Text>
         </View>
 
-        {/* Appointment Details Section */}
+        {/* Appointment Details */}
         <View style={styles.detailCard}>
           <Text style={styles.sectionTitle}>Appointment Details</Text>
           <Text style={styles.sectionContent}>
@@ -130,7 +165,7 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
           </Text>
         </View>
 
-        {/* Contact Information Section */}
+        {/* Contact Information */}
         <View style={styles.detailCard}>
           <Text style={styles.sectionTitle}>Contact Information</Text>
           <Text style={styles.sectionContent}>
@@ -141,27 +176,23 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
           </Text>
         </View>
 
-        {/* Rating Section */}
+        {/* Ratings */}
         <View style={styles.detailCard}>
-          <Text style={styles.sectionTitle}>Rate this Consultant</Text>
-          <View style={styles.ratingContainer}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity key={star} onPress={() => setRating(star)}>
-                <Ionicons name={star <= rating ? 'star' : 'star-outline'} size={30} color="#FFD700" />
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TouchableOpacity style={styles.submitRatingButton} onPress={handleRatingSubmit}>
-            <Text style={styles.buttonText}>Submit Rating</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Average Rating</Text>
+          <Text style={[styles.sectionContent, { fontSize: 20 }]}>
+            {average != null ? `⭐ ${average}` : 'No ratings yet'}
+          </Text>
+        </View>
+        <View style={styles.detailCard}>
+          <Text style={styles.sectionTitle}>Your Rating</Text>
+          <Text style={[styles.sectionContent, { fontSize: 18 }]}>
+            {userRating != null ? `⭐ ${userRating}` : 'You have not rated this doctor.'}
+          </Text>
         </View>
 
-        {/* Action Buttons */}
+        {/* Actions */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.appointmentButton}
-            onPress={handleMakeAppointment}
-          >
+          <TouchableOpacity style={styles.appointmentButton} onPress={handleMakeAppointment}>
             <Text style={styles.buttonText}>Make Appointment</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.chatButton} onPress={handleChatNavigation}>
@@ -175,6 +206,9 @@ const ConsultantDetailScreen = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF4E6' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorText: { flex: 1, textAlign: 'center', marginTop: 20 },
+
   profileContainer: {
     alignItems: 'center',
     paddingVertical: 20,
@@ -190,27 +224,7 @@ const styles = StyleSheet.create({
     color: '#333',
     marginTop: 6,
   },
-  appointmentButton: {
-    margin: 20,
-    padding: 15,
-    backgroundColor: '#6bc4c1',
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  chatButton: {
-    margin: 20,
-    padding: 15,
-    backgroundColor: '#FF6F61',
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  chatButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  buttonContainer: { flexDirection: 'row', justifyContent: 'center' },
+
   detailCard: {
     backgroundColor: '#fff',
     padding: 20,
@@ -236,18 +250,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#555',
   },
-  ratingContainer: {
+
+  buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginVertical: 10,
+    marginVertical: 16,
   },
-  submitRatingButton: {
+  appointmentButton: {
+    marginHorizontal: 8,
+    padding: 15,
     backgroundColor: '#6bc4c1',
-    padding: 12,
     borderRadius: 10,
     alignItems: 'center',
-    marginTop: 10,
   },
+  chatButton: {
+    marginHorizontal: 8,
+    padding: 15,
+    backgroundColor: '#FF6F61',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 });
-
 export default ConsultantDetailScreen;
+

@@ -11,6 +11,8 @@ import { Picker } from '@react-native-picker/picker';
 import {
   collection,
   addDoc,
+  doc,
+  getDoc,
   Timestamp,
   serverTimestamp,
   query,
@@ -44,6 +46,21 @@ export default function AppointmentScreen({ route, navigation }) {
   const user = auth.currentUser;
   const userId = user.uid;
 
+  // ▶️ Load the user's fullName from Firestore
+  const [fullName, setFullName] = useState('');
+  useEffect(() => {
+    (async () => {
+      try {
+        const userSnap = await getDoc(doc(db, 'users', userId));
+        if (userSnap.exists() && userSnap.data().fullName) {
+          setFullName(userSnap.data().fullName);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch fullName:', e);
+      }
+    })();
+  }, [userId]);
+
   // Available modes
   const modes = [
     ...(usedConsultant.availableModes?.includes('online') ? ['Online'] : []),
@@ -75,6 +92,7 @@ export default function AppointmentScreen({ route, navigation }) {
     try {
       await addDoc(collection(db, 'bookings'), {
         userId,
+        fullName,
         consultantId: usedConsultant.id,
         consultantName: usedConsultant.name,
         doctorId: usedConsultant.userId,
@@ -103,7 +121,8 @@ export default function AppointmentScreen({ route, navigation }) {
     selectedHour,
     selectedPlatform,
     mode,
-    navigation
+    navigation,
+    fullName
   ]);
 
   // Date picker handlers

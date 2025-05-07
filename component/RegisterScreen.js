@@ -14,24 +14,57 @@ const RegisterScreen = ({ navigation }) => {
   const [dueDate, setDueDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // NEW: emergency contact
+  const [emergencyNumber, setEmergencyNumber] = useState('');
+
   const auth = getAuth(app); // Pass the app instance here
 
+  // Valid PH: 09XXXXXXXXX, 639XXXXXXXXX, or +639XXXXXXXXX
+  const validPH = (num) => {
+    return (
+      /^09\d{9}$/.test(num) ||
+      /^639\d{9}$/.test(num) ||
+      /^\+639\d{9}$/.test(num)
+    );
+  };
+
+  // Normalize to "639XXXXXXXXX" (no leading "+")
+  const normalize = (num) => {
+    if (num.startsWith('+')) {
+      return num.slice(1);         // +639xxxxxxxx -> 639xxxxxxxx
+    }
+    if (num.startsWith('09')) {
+      return '63' + num.slice(1);  // 09xxxxxxxxx -> 63xxxxxxxxx
+    }
+    return num;                    // already 639xxxxxxxxx
+  };
+
   const validateForm = () => {
-    if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(email)) {
+    if (!fullName.trim()) {
+      Alert.alert('Missing Name', 'Please enter your full name.');
+      return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       Alert.alert('Invalid Email', 'Please enter a valid email address.');
       return false;
     }
     if (password.length < 8) {
-      Alert.alert('Weak Password', 'Password must be at least 8 characters long.');
+      Alert.alert('Weak Password', 'Password must be at least 8 characters.');
       return false;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Password Mismatch', 'The passwords do not match.');
+      Alert.alert('Password Mismatch', 'Passwords do not match.');
       return false;
     }
-    // Ensure dueDate is in the future
-    if (!dueDate || dueDate <= new Date()) {
-      Alert.alert('Invalid Due Date', 'Please select a valid future due date.');
+    if (dueDate <= new Date()) {
+      Alert.alert('Invalid Due Date', 'Please select a future due date.');
+      return false;
+    }
+    if (!validPH(emergencyNumber)) {
+      Alert.alert(
+        'Invalid Number',
+        'Enter PH number as 09xxxxxxxxx, 639xxxxxxxxx, or +639xxxxxxxxx.'
+      );
       return false;
     }
     return true;
@@ -40,31 +73,35 @@ const RegisterScreen = ({ navigation }) => {
   const handleRegister = async () => {
     if (!validateForm()) return;
 
+    const formattedNumber = normalize(emergencyNumber);
+
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      const { user } = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
 
       // Store user information in Firestore with UID as document ID
       await setDoc(doc(db, 'users', user.uid), {
         userId: user.uid,
-        fullName: fullName,
-        email: email,
-        dueDate: dueDate,  // Stores the selected due date
+        fullName: fullName.trim(),
+        email: email.trim(),
+        dueDate: dueDate.toISOString().split('T')[0],
+        emergencyNumber: formattedNumber
       });
 
-      Alert.alert('Success', 'User registered successfully!');
+      Alert.alert('Success', 'Registered successfully!');
       navigation.navigate('Login'); // Navigate to Login screen
     } catch (error) {
       console.error('Registration Error:', error);
-      Alert.alert('Registration Error', `Failed to register. ${error.message}`);
+      Alert.alert('Registration Error', error.message);
     }
   };
 
-  const onChangeDueDate = (event, selectedDate) => {
-    setShowDatePicker(Platform.OS === 'ios'); // Keep picker open on iOS if needed
-    if (selectedDate) {
-      setDueDate(selectedDate);
-    }
+  const onChangeDueDate = (event, selected) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selected) setDueDate(selected);
   };
 
   return (
@@ -100,18 +137,26 @@ const RegisterScreen = ({ navigation }) => {
         onChangeText={setConfirmPassword}
       />
       
+      <TextInput
+        style={styles.input}
+        placeholder="Emergency Contact Number"
+        keyboardType="phone-pad"
+        value={emergencyNumber}
+        onChangeText={setEmergencyNumber}
+      />
+      
       <TouchableOpacity 
         style={styles.dateButton} 
         onPress={() => setShowDatePicker(true)}
       >
         <Text style={styles.dateButtonText}>
-          {dueDate ? `Due Date: ${dueDate.toLocaleDateString()}` : 'Select Due Date'}
+          {dueDate.toLocaleDateString()}
         </Text>
       </TouchableOpacity>
       
       {showDatePicker && (
         <DateTimePicker
-          value={dueDate || new Date()}
+          value={dueDate}
           mode="date"
           display="default"
           onChange={onChangeDueDate}
