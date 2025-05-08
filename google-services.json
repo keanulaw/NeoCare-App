@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "398145643581",
+    "project_id": "neocare-2434d",
+    "storage_bucket": "neocare-2434d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:398145643581:android:daa7c369c6a21485d9b654",
+        "android_client_info": {
+          "package_name": "com.keanulaw.NeoCare"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0IxJJFIpd58BLdsAPJz9_k5lPJsng4kA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
