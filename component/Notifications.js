@@ -1,21 +1,37 @@
+// component/Notifications.js
+
 import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+import * as Device       from 'expo-device';
 import { Alert, Platform } from 'react-native';
 
+// Show alerts/sounds even in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
+    shouldShowAlert:   true,
+    shouldPlaySound:   true,
+    shouldSetBadge:    true,
   }),
 });
 
+export async function configureAndroidChannel() {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+}
+
 export async function registerForPushNotificationsAsync() {
-  if (!Constants.isDevice) {
-    console.log('Must use physical device for Push Notifications');
+  // must be on a real device
+  if (!Device.isDevice) {
+    console.warn('Must use a physical device for Push Notifications');
     return null;
   }
 
+  // ask for permissions
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
   if (existingStatus !== 'granted') {
@@ -23,31 +39,20 @@ export async function registerForPushNotificationsAsync() {
     finalStatus = status;
   }
   if (finalStatus !== 'granted') {
-    Alert.alert(
-      'Permission required',
-      'Failed to get push token for push notification!'
-    );
+    Alert.alert('Permission required', 'Failed to get push token!');
     return null;
   }
 
-  const { data: token } = await Notifications.getExpoPushTokenAsync();
-  console.log('Expo push token:', token);
+  // *** THIS IS THE CHANGE ***
+  // get the **FCM device token** (not the Expo token)
+  const { data: token } = await Notifications.getDevicePushTokenAsync();
+  console.log('🔥 FCM token:', token);
   return token;
 }
 
 export function listenForNotifications(onReceive) {
-  return Notifications.addNotificationReceivedListener(notification => {
-    onReceive(notification.request.content.data);
+  // will fire when user taps a notification or it arrives in background
+  return Notifications.addNotificationResponseReceivedListener(response => {
+    onReceive(response.notification.request.content.data);
   });
-}
-
-export function configureAndroidChannel() {
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
-  }
 }

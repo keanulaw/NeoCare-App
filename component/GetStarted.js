@@ -53,9 +53,9 @@ export default function GetStarted({ navigation }) {
 
   const handleEmergencyPress = async () => {
     // Adjust this to where your Node server really is!
-    const baseURL = 
+    const baseURL =
       Platform.OS === 'android'
-        ? 'http://10.0.2.2:3000'
+        ? 'http://192.168.1.11:3000'
         : 'http://localhost:3000';
     // Uncomment the line below if on a real device pointing at your PC's IP:
     // const baseURL = 'http://192.168.1.10:3000';

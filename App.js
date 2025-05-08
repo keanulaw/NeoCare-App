@@ -1,13 +1,13 @@
 import 'react-native-reanimated';
 import 'react-native-get-random-values';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Alert, Platform } from 'react-native';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { getAuth } from 'firebase/auth';
+import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import GetStarted from './component/GetStarted';
 import Dashboard from './component/Dashboard';
@@ -36,8 +36,8 @@ import {
 const Stack = createStackNavigator();
 const Tab   = createBottomTabNavigator();
 
-// Animated tab icon component
 const AnimatedIoniconsComponent = Animated.createAnimatedComponent(Ionicons);
+
 function AnimatedTabIcon({ name, focused, size, color }) {
   const style = useAnimatedStyle(() => ({
     transform: [{ scale: focused ? withSpring(1.2) : withSpring(1) }],
@@ -96,16 +96,16 @@ function HomeTabs() {
 }
 
 export default function App() {
-  // Ref for navigation container
   const navigationRef = useNavigationContainerRef();
 
   useEffect(() => {
     // 1️⃣ Create Android notification channel
     configureAndroidChannel();
 
-    // 2️⃣ Register for push, then POST FCM token to your backend
+    // 2️⃣ Register for FCM and send to your backend
     registerForPushNotificationsAsync()
       .then(fcmToken => {
+        console.log('🔥 FCM token:', fcmToken);
         if (!fcmToken) return;
         const user = getAuth().currentUser;
         if (!user) return;
@@ -120,17 +120,13 @@ export default function App() {
       })
       .catch(err => console.error('Push registration failed:', err));
 
-    // 3️⃣ Listen for incoming notifications
+    // 3️⃣ Listen for notification interactions
     const subscription = listenForNotifications(data => {
-      // data.type is set by your payload
       if (data.type === 'APPOINTMENT_ACCEPTED') {
         Alert.alert('Appointment Accepted', 'Your appointment has been accepted.');
-        // navigate to the Appointments tab
         navigationRef.navigate('HomeTabs', { screen: 'Appointments' });
-      }
-      else if (data.type === 'NEW_MESSAGE') {
+      } else if (data.type === 'NEW_MESSAGE') {
         Alert.alert('New Message', 'You have a new message!');
-        // navigate to the Message tab
         navigationRef.navigate('HomeTabs', { screen: 'Message' });
       }
     });
@@ -141,30 +137,30 @@ export default function App() {
   return (
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="GetStarted"           component={GetStarted} />
-        <Stack.Screen name="HomeTabs"             component={HomeTabs} />
-        <Stack.Screen name="Assessment"           component={AssessmentScreen} />
-        <Stack.Screen name="Register"             component={RegisterScreen} />
-        <Stack.Screen name="Login"                component={LoginScreen} />
-        <Stack.Screen name="MoodDetail"           component={MoodDetail} />
+        <Stack.Screen name="GetStarted"            component={GetStarted} />
+        <Stack.Screen name="HomeTabs"              component={HomeTabs} />
+        <Stack.Screen name="Assessment"            component={AssessmentScreen} />
+        <Stack.Screen name="Register"              component={RegisterScreen} />
+        <Stack.Screen name="Login"                 component={LoginScreen} />
+        <Stack.Screen name="MoodDetail"            component={MoodDetail} />
         <Stack.Screen name="BirthingCenterLocator" component={BirthingCenterLocator} />
-        <Stack.Screen name="ConsultantScreen"     component={ConsultantScreen} />
-        <Stack.Screen name="ConsultantDetail"     component={ConsultantDetailScreen} />
-        <Stack.Screen name="Chat"                 component={ChatScreen} />
+        <Stack.Screen name="ConsultantScreen"      component={ConsultantScreen} />
+        <Stack.Screen name="ConsultantDetail"      component={ConsultantDetailScreen} />
+        <Stack.Screen name="Chat"                  component={ChatScreen} />
         <Stack.Screen
           name="AppointmentScreen"
           component={AppointmentScreen}
           options={{
-            headerShown:  true,
-            title:        'Book Appointment',
-            headerStyle:  { backgroundColor: '#FFF4E6' },
+            headerShown:   true,
+            title:         'Book Appointment',
+            headerStyle:   { backgroundColor: '#FFF4E6' },
             headerTintColor: '#D47FA6',
           }}
         />
-        <Stack.Screen name="Bookings"             component={BookingsScreen} options={{ title: 'My Bookings' }} />
-        <Stack.Screen name="Tracker"              component={Tracker} options={{ title: 'Pregnancy Tracker' }} />
-        <Stack.Screen name="ChatBot"              component={ChatBotScreen} options={{ title: 'Chat Bot' }} />
-        <Stack.Screen name="DoctorsScreen"        component={DoctorsScreen} />
+        <Stack.Screen name="Bookings"              component={BookingsScreen} options={{ title: 'My Bookings' }} />
+        <Stack.Screen name="Tracker"               component={Tracker} options={{ title: 'Pregnancy Tracker' }} />
+        <Stack.Screen name="ChatBot"               component={ChatBotScreen} options={{ title: 'Chat Bot' }} />
+        <Stack.Screen name="DoctorsScreen"         component={DoctorsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
