@@ -98,7 +98,7 @@ export default function BookingsScreen({ navigation }) {
   const handlePay = async booking => {
     try {
       const resp = await fetch(
-        'http://192.168.1.10:3000/api/payments/link',
+        'http://192.168.1.11/api/payments/link',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
