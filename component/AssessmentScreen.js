@@ -10,6 +10,7 @@ import {
   Alert,
   RefreshControl,
   SafeAreaView,
+  TouchableOpacity,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -74,17 +75,15 @@ export default function AssessmentScreen({ navigation }) {
       const data = {};
       snap.forEach(docSnap => {
         const d = docSnap.data();
-        // keep only one entry per date
         if (!data[d.date] || docSnap.id === generateMoodDocId(userId, d.date)) {
           data[d.date] = { id: docSnap.id, ...d };
         }
       });
       setMoods(data);
 
-      // calculate monthly averages
       const agg = {};
       Object.values(data).forEach(({ date, mood }) => {
-        const month = date.slice(0, 7); // "YYYY-MM"
+        const month = date.slice(0, 7);
         if (!agg[month]) agg[month] = { sum: 0, count: 0 };
         agg[month].sum += MOOD_VALUES[mood] ?? 0;
         agg[month].count += 1;
@@ -94,6 +93,7 @@ export default function AssessmentScreen({ navigation }) {
         avg[m] = +(sum / count).toFixed(2);
       });
       setMonthlyAvg(avg);
+
     } catch (e) {
       console.error(e);
       setError('Failed to load moods.');
@@ -107,7 +107,6 @@ export default function AssessmentScreen({ navigation }) {
     fetchMoods();
   }, [fetchMoods]);
 
-  // minimal markedDates so the calendar behaves correctly
   const markedDates = useMemo(() => {
     return Object.keys(moods).reduce((acc, date) => {
       acc[date] = { marked: true };
@@ -115,7 +114,6 @@ export default function AssessmentScreen({ navigation }) {
     }, {});
   }, [moods]);
 
-  // prepare monthly list for display
   const monthlyList = useMemo(() => {
     return Object.entries(monthlyAvg)
       .sort((a, b) => (a[0] < b[0] ? 1 : -1))
@@ -166,36 +164,33 @@ export default function AssessmentScreen({ navigation }) {
               monthTextColor: theme.accent,
               indicatorColor: theme.primary,
             }}
+            // ← remove onDayPress completely when using dayComponent
             dayComponent={({ date, state }) => {
               const entry = moods[date.dateString];
               const emoji = entry ? MOOD_EMOJIS[entry.mood] : null;
               return (
-                <View style={styles.dayContainer}>
-                  {/* always show day number */}
-                  <Text style={[styles.dayNumber, state === 'disabled' && styles.disabled]}>
+                <TouchableOpacity
+                  style={styles.dayContainer}
+                  onPress={() => {
+                    if (entry) {
+                      navigation.navigate('MoodDetail', {
+                        moodData: entry,
+                        onUpdate: fetchMoods,
+                      });
+                    } 
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.dayNumber,
+                      state === 'disabled' && styles.disabled,
+                    ]}
+                  >
                     {date.day}
                   </Text>
-                  {/* overlay emoji if a mood exists for that day */}
                   {emoji && <Text style={styles.emoji}>{emoji}</Text>}
-                </View>
+                </TouchableOpacity>
               );
-            }}
-            onDayPress={day => {
-              const entry = moods[day.dateString];
-              if (entry) {
-                // navigate to detail if one exists
-                navigation.navigate('MoodDetail', {
-                  moodData: entry,
-                  onUpdate: fetchMoods,
-                });
-              } else {
-                // otherwise open popup to add a new mood
-                navigation.navigate('MoodPopup', {
-                  userId,
-                  selectedDate: day.dateString,
-                  onSubmit: fetchMoods,
-                });
-              }
             }}
           />
 
@@ -211,7 +206,6 @@ export default function AssessmentScreen({ navigation }) {
               </View>
             )}
             {monthlyList.map(({ month, avg, desc }) => {
-              // pick a background color based on average
               const colorKey = Object.keys(MOOD_VALUES).find(k => MOOD_VALUES[k] <= avg);
               return (
                 <View
@@ -281,7 +275,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   dayContainer: {
-    width: 32,       // match the calendar’s cell size
+    width: 32,
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
@@ -293,7 +287,7 @@ const styles = StyleSheet.create({
   },
   emoji: {
     fontSize: 18,
-    marginTop: -2,   // nudge if needed
+    marginTop: -2,
   },
   disabled: {
     color: '#ccc',
