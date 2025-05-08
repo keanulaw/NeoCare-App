@@ -25,12 +25,7 @@ import theme from '../src/theme';
 import commonStyles from '../src/commonStyles';
 
 export default function AppointmentScreen({ route, navigation }) {
-  const {
-    consultant,
-    date: dateParam,
-    time: timeParam,
-    platform: platformParam
-  } = route.params;
+  const { consultant, date: dateParam, time: timeParam, platform: platformParam } = route.params;
   const usedConsultant = consultant;
 
   // 1️⃣ Initial date
@@ -39,13 +34,11 @@ export default function AppointmentScreen({ route, navigation }) {
     : getNextAvailableDate(usedConsultant.availableDays || []);
   const [selectedDate, setSelectedDate] = useState(initialDate);
 
-  // 2️⃣ Time
-  const [selectedHour, setSelectedHour] = useState(timeParam || null);
+  // 2️⃣ Time (now as empty string rather than null)
+  const [selectedHour, setSelectedHour] = useState(timeParam || '');
 
-  // 3️⃣ Derive availablePlatforms from consultant.platform
-  const modesRaw = Array.isArray(usedConsultant.platform)
-    ? usedConsultant.platform
-    : [];
+  // 3️⃣ Platform (also default to empty string)
+  const modesRaw = Array.isArray(usedConsultant.platform) ? usedConsultant.platform : [];
   const availablePlatforms = modesRaw
     .map(m => {
       const low = String(m).toLowerCase();
@@ -54,23 +47,18 @@ export default function AppointmentScreen({ route, navigation }) {
       return String(m).charAt(0).toUpperCase() + String(m).slice(1);
     })
     .filter((v, i, self) => v && self.indexOf(v) === i);
+  const [selectedPlatform, setSelectedPlatform] = useState(platformParam || availablePlatforms[0] || '');
 
-  const [selectedPlatform, setSelectedPlatform] = useState(
-    platformParam || availablePlatforms[0] || null
-  );
-
-  // 4️⃣ Booked times for that exact date
+  // 4️⃣ Booked times
   const [bookedTimes, setBookedTimes] = useState([]);
 
-  // 5️⃣ Misc UI state
+  // 5️⃣ UI state
   const [showIosPicker, setShowIosPicker] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
 
   // 6️⃣ User info
   const user = auth.currentUser;
   const userId = user.uid;
-
-  // ▶️ Load fullName
   const [fullName, setFullName] = useState('');
   useEffect(() => {
     (async () => {
@@ -79,26 +67,21 @@ export default function AppointmentScreen({ route, navigation }) {
         if (snap.exists() && snap.data().fullName) {
           setFullName(snap.data().fullName);
         }
-      } catch (e) {
-        console.warn('Failed to fetch fullName:', e);
-      }
+      } catch (e) { console.warn('Failed to fetch fullName:', e); }
     })();
   }, [userId]);
 
-  // 🔄 Fetch existing bookings for the selected date
+  // 🔄 Fetch existing bookings
   useEffect(() => {
     (async () => {
       try {
         const dayStart = moment(selectedDate).tz('Asia/Manila').startOf('day').toDate();
         const nextDay = moment(dayStart).add(1, 'day').toDate();
-        const startTs = Timestamp.fromDate(dayStart);
-        const nextTs  = Timestamp.fromDate(nextDay);
-
         const q = query(
           collection(db, 'bookings'),
           where('consultantId', '==', usedConsultant.id),
-          where('date', '>=', startTs),
-          where('date', '<', nextTs)
+          where('date', '>=', Timestamp.fromDate(dayStart)),
+          where('date', '<',  Timestamp.fromDate(nextDay))
         );
         const snap = await getDocs(q);
         setBookedTimes(snap.docs.map(d => d.data().hour));
@@ -108,7 +91,7 @@ export default function AppointmentScreen({ route, navigation }) {
     })();
   }, [selectedDate, usedConsultant.id]);
 
-  // 📅 Date-picker change with availability check
+  // 📅 Date-picker change
   const onChangeDate = (event, newDate) => {
     if (!newDate) {
       if (Platform.OS !== 'android') setShowIosPicker(false);
@@ -123,8 +106,6 @@ export default function AppointmentScreen({ route, navigation }) {
     setSelectedDate(newDate);
     if (Platform.OS !== 'android') setShowIosPicker(false);
   };
-
-  // ⚙️ Open date picker
   const showPicker = () => {
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
@@ -138,10 +119,14 @@ export default function AppointmentScreen({ route, navigation }) {
     }
   };
 
-  // 🔘 Handle booking submission
+  // 🔘 Booking submission with separate checks
   const handleBook = useCallback(async () => {
-    if (!selectedHour || !selectedPlatform) {
-      ToastAndroid.show('Please select time & platform', ToastAndroid.SHORT);
+    if (!selectedHour) {
+      ToastAndroid.show('Please select a time', ToastAndroid.SHORT);
+      return;
+    }
+    if (!selectedPlatform) {
+      ToastAndroid.show('Please select a platform', ToastAndroid.SHORT);
       return;
     }
     setIsBooking(true);
@@ -204,8 +189,11 @@ export default function AppointmentScreen({ route, navigation }) {
           {/* Time Picker */}
           <View style={styles.selectionContainer}>
             <Text style={styles.label}>Select Time</Text>
-            <Picker selectedValue={selectedHour} onValueChange={v => setSelectedHour(v)}>
-              <Picker.Item label="-- pick a time --" value={null} />
+            <Picker
+              selectedValue={selectedHour}
+              onValueChange={v => setSelectedHour(v)}
+            >
+              <Picker.Item label="-- pick a time --" value="" />
               {(usedConsultant.consultationHours || [])
                 .filter(h => !bookedTimes.includes(h))
                 .map(h => <Picker.Item key={h} label={h} value={h} />)}
@@ -219,24 +207,29 @@ export default function AppointmentScreen({ route, navigation }) {
               selectedValue={selectedPlatform}
               onValueChange={v => setSelectedPlatform(v)}
             >
-              <Picker.Item label="-- pick a platform --" value={null} />
+              <Picker.Item label="-- pick a platform --" value="" />
               {availablePlatforms.map(p => (
                 <Picker.Item key={p} label={p} value={p} />
               ))}
             </Picker>
           </View>
 
-          {/* Book Button */}
+          {/* Book Button (now disabled until time & platform are chosen) */}
           <TouchableOpacity
-            style={[commonStyles.buttonPrimary, { margin: 20 }]}
+            style={[
+              commonStyles.buttonPrimary,
+              {
+                margin: 20,
+                opacity: (!selectedHour || !selectedPlatform || isBooking) ? 0.5 : 1
+              }
+            ]}
             onPress={handleBook}
-            disabled={isBooking}
+            disabled={!selectedHour || !selectedPlatform || isBooking}
           >
-            {isBooking ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <Text style={commonStyles.buttonText}>Book Appointment</Text>
-            )}
+            {isBooking
+              ? <ActivityIndicator color="#FFF" />
+              : <Text style={commonStyles.buttonText}>Book Appointment</Text>
+            }
           </TouchableOpacity>
         </View>
 
@@ -271,28 +264,20 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF4E6' },
   card: { ...commonStyles.card, margin: 20 },
   name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 6
+    fontSize: 24, fontWeight: 'bold', color: '#333',
+    textAlign: 'center', marginBottom: 6
   },
   rateLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 10,
+    fontSize: 16, fontWeight: '600',
+    textAlign: 'center', marginBottom: 10,
     color: theme.colors.primary
   },
   image: { width: 120, height: 120, borderRadius: 60, alignSelf: 'center' },
   pickerContainer: { marginVertical: 20 },
   label: { fontSize: 16, fontWeight: '600', color: '#444', marginBottom: 10 },
   pickerButton: {
-    backgroundColor: '#FFF',
-    borderRadius: 10,
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#E0E0E0'
+    backgroundColor: '#FFF', borderRadius: 10,
+    padding: 15, borderWidth: 1, borderColor: '#E0E0E0'
   },
   pickerText: { fontSize: 16, color: '#333' },
   selectionContainer: { marginBottom: 20 },

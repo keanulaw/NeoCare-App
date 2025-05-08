@@ -183,9 +183,17 @@ export default function AssessmentScreen({ navigation }) {
             onDayPress={day => {
               const entry = moods[day.dateString];
               if (entry) {
+                // navigate to detail if one exists
                 navigation.navigate('MoodDetail', {
                   moodData: entry,
                   onUpdate: fetchMoods,
+                });
+              } else {
+                // otherwise open popup to add a new mood
+                navigation.navigate('MoodPopup', {
+                  userId,
+                  selectedDate: day.dateString,
+                  onSubmit: fetchMoods,
                 });
               }
             }}
