@@ -12,7 +12,7 @@ import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import CustomHeader from './CustomHeader';
 
-const BACKEND_URL = 'http://192.168.254.115:3000/chatbot';
+const BACKEND_URL = 'http://10.0.2.2:3000/chatbot';
 const WEEKDAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTHS   = [
   'January','February','March','April','May','June',
@@ -132,281 +132,106 @@ const parseUserTime = input => {
 };
 
 export default function ChatBotScreen({ navigation }) {
-  const [messages, setMessages]             = useState([]);
-  const [loading, setLoading]               = useState(false);
-  const [stage, setStage]                   = useState('');
-  const [doctor, setDoctor]                 = useState(null);
+  const [sessionId] = useState(() => Math.random().toString(36).slice(2));
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [stage, setStage]       = useState('bot');
+  const [doctor, setDoctor]     = useState(null);
   const [availableDates, setAvailableDates] = useState([]);
-  const [chosenDate, setChosenDate]         = useState(null);
-  const [chosenTime, setChosenTime]         = useState(null);
+  const [chosenDate, setChosenDate] = useState(null);
+  const [chosenTime, setChosenTime] = useState(null);
   const [chosenPlatform, setChosenPlatform] = useState(null);
 
+  // ————— On mount: hit the server once to grab the very first question —————
   useEffect(() => {
-    setMessages([{
-      _id: 1,
-      text: 'Hello! Tell me your symptoms, and I’ll recommend a doctor.',
-      createdAt: new Date(),
-      user: { _id: 2, name: 'HealthBot' },
-    }]);
-  }, []);
+    (async () => {
+      setLoading(true);
+      try {
+        const resp = await fetch(BACKEND_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, message: 'hi' })
+        });
+        const data = await resp.json();
+        setMessages([{
+          _id: 1,
+          text: data.question || data.advice,
+          createdAt: new Date(),
+          user: { _id: 2, name: 'HealthBot' }
+        }]);
+      } catch (e) {
+        setMessages([{
+          _id: 1,
+          text: `Error starting chat: ${e.message}`,
+          createdAt: new Date(),
+          user: { _id: 2, name: 'HealthBot' }
+        }]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [sessionId]);
 
   const resetConversation = () => {
-    setStage('');
+    setStage('bot');
     setDoctor(null);
     setAvailableDates([]);
     setChosenDate(null);
     setChosenTime(null);
     setChosenPlatform(null);
+    setMessages([]);  // if you want to clear the chat
+    // optionally rerun the useEffect logic by bumping a key or reloading the screen
   };
 
-  const onSend = useCallback(async (newMsgs = []) => {
-    const userText = newMsgs[0].text.trim();
-    if (!userText) return;
+  const onSend = useCallback(async newMsgs => {
+    const userMsg = newMsgs[0].text.trim();
     setMessages(prev => GiftedChat.append(prev, newMsgs));
     setLoading(true);
 
     try {
-      // 0) Recommendation
-      if (stage === '') {
-        const resp = await fetch(BACKEND_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symptoms: userText }),
-        });
-        const data = await resp.json();
-        if (!resp.ok || data.error) throw new Error(data.error || 'Service error.');
+      const resp = await fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, message: userMsg })
+      });
+      const data = await resp.json();
 
-        const recDoc = await getConsultantById(data.doctorId);
-        if (!recDoc) throw new Error('No matching doctor found.');
+      // append standard bot text
+      let botText = data.advice || '';
+      if (data.question) {
+        botText += (botText ? '\n\n' : '') + data.question;
+      }
 
-        setDoctor(recDoc);
-        const datesList = upcomingDates(recDoc.availableDays || [], 14);
-        setAvailableDates(datesList);
+      setMessages(prev => GiftedChat.append(prev, [{
+        _id: Math.random().toString(36).substr(2,9),
+        text: botText,
+        createdAt: new Date(),
+        user: { _id: 2, name: 'HealthBot' }
+      }]));
 
-        const preview = datesList.slice(0,5)
-          .map(d => `• ${formatWordDate(d)}`)
-          .join('\n');
+      // if server flagged a booking action, insert a special "booking" message
+      if (data.action === 'book' && data.consultant) {
         setMessages(prev => GiftedChat.append(prev, [{
-          _id: Math.random(),
-          text: `${data.explanation}
-Next available dates:
-${preview}
-
-Shall we book an appointment? (Yes/No)`,
+          _id: Math.random().toString(36).substr(2,9),
+          type: 'booking',
+          consultant: data.consultant,
+          nextDate: data.nextDate,       // ISO string
+          text: `Book with Dr. ${data.consultant.name} on ${formatWordDate(data.nextDate)}`,
           createdAt: new Date(),
-          user: { _id: 2, name: 'HealthBot' },
+          user: { _id: 2, name: 'HealthBot' }
         }]));
-        setStage('confirmBooking');
-      }
-
-      // 1) Confirm booking
-      else if (stage === 'confirmBooking') {
-        if (/^y(es)?$/i.test(userText)) {
-          setMessages(prev => GiftedChat.append(prev, [{
-            _id: Math.random(),
-            text: `Great! Choose a date:
-${availableDates.map(d => formatWordDate(d)).join('\n')}`,
-            createdAt: new Date(),
-            user: { _id: 2, name: 'HealthBot' },
-          }]));
-          setStage('selectDate');
-        } else {
-          setMessages(prev => GiftedChat.append(prev, [{
-            _id: Math.random(),
-            text: 'No worries—let me know if you need anything else.',
-            createdAt: new Date(),
-            user: { _id: 2, name: 'HealthBot' },
-          }]));
-          resetConversation();
-        }
-      }
-
-      // 2) Select date
-      else if (stage === 'selectDate') {
-        const lower = userText.toLowerCase();
-        const todayDt = new Date();
-
-        // a) "This week" shortcut
-        if (/\bthis week\b/.test(lower)) {
-          const endOfWeek = new Date(todayDt);
-          endOfWeek.setDate(todayDt.getDate() + (6 - todayDt.getDay()));
-          const thisWeekDates = availableDates.filter(d => {
-            const dt = new Date(d);
-            return dt >= todayDt && dt <= endOfWeek;
-          });
-          if (thisWeekDates.length) {
-            const sel = thisWeekDates[0];
-            setChosenDate(sel);
-            setStage('selectTime');
-            setMessages(prev => GiftedChat.append(prev, [{
-              _id: Math.random(),
-              text: `What time on ${formatWordDate(sel)}?
-Options: ${doctor.consultationHours.join(', ')}`,
-              createdAt: new Date(),
-              user: { _id: 2, name: 'HealthBot' },
-            }]));
-          } else {
-            setMessages(prev => GiftedChat.append(prev, [{
-              _id: Math.random(),
-              text: `No available slots this week. Please pick from:
-${availableDates.map(d => formatWordDate(d)).join('\n')}`,
-              createdAt: new Date(),
-              user: { _id: 2, name: 'HealthBot' },
-            }]));
-          }
-          setLoading(false);
-          return;
-        }
-        // b) "Next week" shortcut
-        if (/\bnext week\b/.test(lower)) {
-          const endOfWeek = new Date(todayDt);
-          endOfWeek.setDate(todayDt.getDate() + (6 - todayDt.getDay()));
-          const startNext = new Date(endOfWeek);
-          startNext.setDate(endOfWeek.getDate() + 1);
-          const endNext = new Date(startNext);
-          endNext.setDate(startNext.getDate() + 6);
-          const nextWeekDates = availableDates.filter(d => {
-            const dt = new Date(d);
-            return dt >= startNext && dt <= endNext;
-          });
-          if (nextWeekDates.length) {
-            const sel = nextWeekDates[0];
-            setChosenDate(sel);
-            setStage('selectTime');
-            setMessages(prev => GiftedChat.append(prev, [{
-              _id: Math.random(),
-              text: `What time on ${formatWordDate(sel)}?
-Options: ${doctor.consultationHours.join(', ')}`,
-              createdAt: new Date(),
-              user: { _id: 2, name: 'HealthBot' },
-            }]));
-          } else {
-            setMessages(prev => GiftedChat.append(prev, [{
-              _id: Math.random(),
-              text: `No available slots next week. Please pick from:
-${availableDates.map(d => formatWordDate(d)).join('\n')}`,
-              createdAt: new Date(),
-              user: { _id: 2, name: 'HealthBot' },
-            }]));
-          }
-          setLoading(false);
-          return;
-        }
-
-        // c) Try to parse a specific date
-        const { date } = parseDateTime(userText);
-        if (!date || !availableDates.includes(date)) {
-          const attempted = date ? formatWordDate(date) : `"${userText}"`;
-          setMessages(prev => GiftedChat.append(prev, [{
-            _id: Math.random(),
-            text: `Sorry, ${attempted} isn't available.
-Please pick from:
-${availableDates.map(d => formatWordDate(d)).join('\n')}`,
-            createdAt: new Date(),
-            user: { _id: 2, name: 'HealthBot' },
-          }]));
-          setLoading(false);
-          return;
-        }
-
-        // d) Valid selection
-        setChosenDate(date);
-        setMessages(prev => GiftedChat.append(prev, [{
-          _id: Math.random(),
-          text: `What time on ${formatWordDate(date)}?
-Options: ${doctor.consultationHours.join(', ')}`,
-          createdAt: new Date(),
-          user: { _id: 2, name: 'HealthBot' },
-        }]));
-        setStage('selectTime');
-      }
-
-      // 3) Select time
-      else if (stage === 'selectTime') {
-        const userTime = parseUserTime(userText);
-        if (!userTime) {
-          setMessages(prev => GiftedChat.append(prev, [{
-            _id: Math.random(),
-            text: 'Please enter a time like "8 PM" or "14:30".',
-            createdAt: new Date(),
-            user: { _id: 2, name: 'HealthBot' },
-          }]));
-          setLoading(false);
-          return;
-        }
-        const matchSlot = doctor.consultationHours.find(slot => {
-          const start = slot.split('to')[0].trim();
-          return parseUserTime(start) === userTime;
-        });
-        if (!matchSlot) {
-          setMessages(prev => GiftedChat.append(prev, [{
-            _id: Math.random(),
-            text: `Sorry, ${userTime} isn't available. Available times: ${doctor.consultationHours.join(', ')}`,
-            createdAt: new Date(),
-            user: { _id: 2, name: 'HealthBot' },
-          }]));
-          setLoading(false);
-          return;
-        }
-        setChosenTime(matchSlot);
-        setMessages(prev => GiftedChat.append(prev, [{
-          _id: Math.random(),
-          text: 'Online or In Person?',
-          createdAt: new Date(),
-          user: { _id: 2, name: 'HealthBot' },
-        }]));
-        setStage('selectPlatform');
-      }
-
-      // 4) Select platform
-      else if (stage === 'selectPlatform') {
-        const platform = userText.toLowerCase().includes('online') ? 'Online' : 'In Person';
-        setChosenPlatform(platform);
-        setMessages(prev => GiftedChat.append(prev, [{
-          _id: Math.random(),
-          type: 'confirm',
-          text: `Confirm appointment:
-${formatWordDate(chosenDate)}
-Time: ${chosenTime}
-Mode: ${platform}
-(Yes/No)`,
-          createdAt: new Date(),
-          user: { _id: 2, name: 'HealthBot' },
-        }]));
-        setStage('confirmDetails');
-      }
-
-      // 5) Confirm details
-      else if (stage === 'confirmDetails') {
-        if (/^y(es)?$/i.test(userText)) {
-          navigation.navigate('AppointmentScreen', {
-            consultant: doctor,
-            date: chosenDate,
-            time: chosenTime,
-            platform: chosenPlatform,
-          });
-        } else {
-          setMessages(prev => GiftedChat.append(prev, [{
-            _id: Math.random(),
-            text: 'Appointment cancelled.',
-            createdAt: new Date(),
-            user: { _id: 2, name: 'HealthBot' },
-          }]));
-        }
-        resetConversation();
       }
     } catch (err) {
       setMessages(prev => GiftedChat.append(prev, [{
-        _id: Math.random(),
+        _id: Math.random().toString(36).substr(2,9),
         text: `Error: ${err.message}`,
         createdAt: new Date(),
-        user: { _id: 2, name: 'HealthBot' },
+        user: { _id: 2, name: 'HealthBot' }
       }]));
-      resetConversation();
     } finally {
       setLoading(false);
     }
-  }, [stage, availableDates, doctor, chosenDate, chosenTime, chosenPlatform, navigation]);
+  }, [sessionId]);
 
   return (
     <View style={styles.container}>
@@ -418,8 +243,14 @@ Mode: ${platform}
         renderBubble={props => (
           <Bubble
             {...props}
-            wrapperStyle={{ right: { backgroundColor: '#007AFF' }, left: { backgroundColor: '#ECECEC' } }}
-            textStyle={{ right: { color: '#fff' }, left: { color: '#000' } }}
+            wrapperStyle={{
+              right: { backgroundColor: '#007AFF' },
+              left:  { backgroundColor: '#ECECEC' },
+            }}
+            textStyle={{
+              right: { color: '#fff' },
+              left:  { color: '#000' },
+            }}
           />
         )}
         renderSend={props => (
@@ -428,33 +259,36 @@ Mode: ${platform}
           </Send>
         )}
         renderFooter={() => loading && <ActivityIndicator style={styles.spinner} size="small" />}
-        renderCustomView={props =>
-          props.currentMessage.type === 'confirm' && (
-            <TouchableOpacity
-              style={styles.confirmBtn}
-              onPress={() => {
-                navigation.navigate('AppointmentScreen', {
-                  consultant: doctor,
-                  date: chosenDate,
-                  time: chosenTime,
-                  platform: chosenPlatform,
-                });
-                resetConversation();
-              }}
-            >
-              <Text style={styles.confirmText}>{props.currentMessage.text}</Text>
-            </TouchableOpacity>
-          )
-        }
         scrollToBottom
+        renderCustomView={props => {
+          const m = props.currentMessage;
+          if (m.type === 'booking' && m.consultant) {
+            return (
+              <TouchableOpacity
+                style={styles.confirmBtn}
+                onPress={() =>
+                  navigation.navigate('AppointmentScreen', {
+                    consultant: m.consultant,
+                    date:       m.nextDate,
+                    time:       null,
+                    platform:   m.consultant.platform?.[0] || ''
+                  })
+                }
+              >
+                <Text style={styles.confirmText}>Book Appointment</Text>
+              </TouchableOpacity>
+            );
+          }
+          return null;
+        }}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: '#f8f8f8' },
-  spinner:     { marginVertical: 10 },
+  container: { flex: 1, backgroundColor: '#f8f8f8' },
+  spinner:   { marginVertical: 10 },
   confirmBtn:  { backgroundColor: '#28A745', padding: 10, borderRadius: 6, alignSelf: 'flex-start', marginVertical: 6 },
   confirmText: { color: '#fff', fontWeight: '600' },
 });

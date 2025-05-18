@@ -65,9 +65,7 @@ export default function BookingsScreen({ navigation }) {
   // helper to combine date + hour into a moment
   const getApptMoment = b => {
     if (!b.date) return null;
-    const dateObj = typeof b.date.toDate === 'function'
-      ? b.date.toDate()
-      : new Date(b.date);
+    const dateObj = b.date.toDate?.() ?? new Date(b.date);
     const [h = 0, m = 0] = (typeof b.hour === 'string'
       ? b.hour.split(':')
       : []
@@ -84,27 +82,26 @@ export default function BookingsScreen({ navigation }) {
         && b.paymentStatus === 'unpaid'
         && appt && appt.isSameOrAfter(now);
     }
+
     if (filter === 'complete') {
-      return appt && appt.isBefore(now);
+      return appt && appt.isBefore(now) && b.paymentStatus === 'paid';
     }
+
     // upcoming
-    return appt && appt.isSameOrAfter(now)
-      && (
-        b.status === 'pending'
-        || b.paymentStatus === 'paid'
-      );
+    return appt && appt.isSameOrAfter(now) &&
+      (b.status === 'pending' || b.paymentStatus === 'paid');
   });
 
   const handlePay = async booking => {
     try {
-      const resp = await fetch(
-        'http://192.168.1.11/api/payments/link',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: booking.amount }),
-        }
-      );
+      const resp = await fetch('http://192.168.1.11/api/payments/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount:    booking.amount,
+          bookingId: booking.id
+        }),
+      });
       const { url, error } = await resp.json();
       if (error || !url) throw new Error(error || 'No payment URL');
       await Linking.openURL(url);

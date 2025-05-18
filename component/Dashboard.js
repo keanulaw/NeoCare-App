@@ -128,10 +128,10 @@ export default function Dashboard({ navigation }) {
   );
 
   const quickAccessButtons = [
-    { id: '1', name: 'Health Professionals', icon: 'people', screen: 'ConsultantScreen' },
+    { id: '1', name: 'OB-GYN', icon: 'people', screen: 'ConsultantScreen' },
     { id: '2', name: 'Birth Centers', icon: 'place', screen: 'BirthingCenterLocator' },
-    { id: '3', name: 'Assessment', icon: 'assessment', screen: 'Assessment' },
-    { id: '4', name: 'Tracker', icon: 'track-changes', screen: 'Tracker' },
+    { id: '3', name: 'Moods', icon: 'mood', screen: 'Assessment' },
+    { id: '4', name: 'Notes', icon: 'note', screen: 'Tracker' },
     { id: '5', name: 'My Appointments', icon: 'book-online', screen: 'Bookings' },
   ];
 
@@ -148,12 +148,7 @@ export default function Dashboard({ navigation }) {
               {fullName || auth.currentUser?.displayName || 'User'}
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.notificationIcon}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <Icon name="notifications" size={28} color="#D47FA6" />
-          </TouchableOpacity>
+          
         </View>
 
         <BabySizeCard />

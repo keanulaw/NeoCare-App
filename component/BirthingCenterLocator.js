@@ -37,7 +37,6 @@ export default function BirthingCenterLocator({ navigation }) {
   const [loadingLoc, setLoadingLoc] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Hide native header
   useEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
@@ -77,7 +76,7 @@ export default function BirthingCenterLocator({ navigation }) {
     })();
   }, []);
 
-  // 3️⃣ Whenever we have coords, fetch nearby via Google Places
+  // 3️⃣ Fetch nearby via Google Places
   useEffect(() => {
     if (!userLocation) return;
     fetchNearbyCenters(userLocation.latitude, userLocation.longitude);
@@ -98,18 +97,10 @@ export default function BirthingCenterLocator({ navigation }) {
     }
   };
 
-  // 4️⃣ Filter registered centers by searchTerm
-  const filteredRegistered = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    return registeredCenters.filter(center =>
-      (center.birthCenterName || '').toLowerCase().includes(term)
-    );
-  }, [searchTerm, registeredCenters]);
-
-  // 5️⃣ Filter nearby Places by distance & name
+  // Distance function
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const toRad = v => (v * Math.PI) / 180;
-    const R = 6371; // km
+    const R = 6371; // radius in km
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
     const a =
@@ -120,6 +111,15 @@ export default function BirthingCenterLocator({ navigation }) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
+  // Filter registered centers by searchTerm
+  const filteredRegistered = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return registeredCenters.filter(center =>
+      (center.birthCenterName || '').toLowerCase().includes(term)
+    );
+  }, [searchTerm, registeredCenters]);
+
+  // Filter nearby places by distance & name
   const filteredPlaces = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return birthingCenters
@@ -188,28 +188,46 @@ export default function BirthingCenterLocator({ navigation }) {
             No registered centers match your search.
           </Text>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() =>
-              navigation.navigate('DoctorsScreen', {
-                centerId: item.id,
-                centerName: item.birthCenterName,
-              })
-            }
-          >
-            <Text style={styles.cardTitle}>{item.birthCenterName}</Text>
-            <Text style={styles.cardSubtitle}>{item.email}</Text>
-            {item.birthCenterLocation?.lat && (
-              <Text
-                style={styles.cardLink}
-                onPress={() => openDirections(item.birthCenterLocation)}
-              >
-                Directions →
-              </Text>
-            )}
-          </TouchableOpacity>
-        )}
+        renderItem={({ item }) => {
+          // only show distance if we have both userLocation and stored coords
+          const hasLoc =
+            userLocation &&
+            item.birthCenterLocation?.lat != null &&
+            item.birthCenterLocation?.lng != null;
+
+          const dist = hasLoc
+            ? calculateDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                item.birthCenterLocation.lat,
+                item.birthCenterLocation.lng
+              ).toFixed(2)
+            : null;
+
+          return (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() =>
+                navigation.navigate('DoctorsScreen', {
+                  centerId: item.id,
+                  centerName: item.birthCenterName,
+                })
+              }
+            >
+              <Text style={styles.cardTitle}>{item.birthCenterName}</Text>
+              <Text style={styles.cardSubtitle}>{item.email}</Text>
+              {hasLoc && <Text style={styles.cardSubtitle}>{dist} km</Text>}
+              {hasLoc && (
+                <Text
+                  style={styles.cardLink}
+                  onPress={() => openDirections(item.birthCenterLocation)}
+                >
+                  Directions →
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        }}
       />
 
       {/* Nearby Google Places */}
@@ -245,12 +263,26 @@ export default function BirthingCenterLocator({ navigation }) {
         }
         renderItem={({ item }) => {
           const loc = item.geometry.location;
+          const canShowDistance =
+            userLocation && loc.lat != null && loc.lng != null;
+          const dist = canShowDistance
+            ? calculateDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                loc.lat,
+                loc.lng
+              ).toFixed(2)
+            : null;
+
           return (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{item.name}</Text>
               <Text style={styles.cardSubtitle}>
                 {item.vicinity || 'No address'}
               </Text>
+              {canShowDistance && (
+                <Text style={styles.cardSubtitle}>{dist} km</Text>
+              )}
               <Text
                 style={styles.cardLink}
                 onPress={() => openDirections(loc)}
@@ -315,7 +347,7 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: 14,
     color: theme.colors.subtext,
-    marginVertical: 4,
+    marginVertical: 2,
   },
   cardLink: {
     marginTop: 8,
