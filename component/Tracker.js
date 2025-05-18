@@ -14,12 +14,13 @@ import {
   collection,
   query,
   where,
+  orderBy,
   onSnapshot
 } from "firebase/firestore";
 import theme from "../src/theme";
 import CustomHeader from "./CustomHeader";
 
-const SERVER_URL = "http://192.168.1.2:3000"; // ← update this
+const SERVER_URL = "http://192.168.1.11:3000"; // ← update this
 
 export default function Tracker({ navigation }) {
   const [notes, setNotes] = useState([]);
@@ -29,6 +30,45 @@ export default function Tracker({ navigation }) {
   const [noteSummary, setNoteSummary] = useState("");
   const [noteSummaryLoading, setNoteSummaryLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState("all");
+  const [notesLoading, setNotesLoading] = useState(true);
+
+  // ─── Subscribe to all consultationNotes for this client ────────────────────
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) {
+      setNotesLoading(false);
+      return;
+    }
+
+    const q = query(
+      collection(db, "consultationNotes"),
+      where("clientId", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        const arr = snap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            createdAt: data.createdAt?.toDate() ?? new Date(),
+          };
+        });
+        setNotes(arr);
+        setNotesLoading(false);
+      },
+      err => {
+        console.error("Tracker snapshot error:", err);
+        setNotesLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, []);
 
   // ─── Listen in real time to all notes for this client user ─────────────────────────
   useEffect(() => {
@@ -41,7 +81,7 @@ export default function Tracker({ navigation }) {
     // listen in real time to all notes for this client user
     const notesQ = query(
       collection(db, "consultationNotes"),
-      where("clientUserId", "==", user.uid)
+      where("clientId", "==", user.uid)
     );
 
     const unsubscribe = onSnapshot(
@@ -54,8 +94,8 @@ export default function Tracker({ navigation }) {
               id: d.id,
               ...data,
               createdAt: data.createdAt?.toDate() ?? new Date(),
-              consultantId: data.consultantId,
-              consultantName: data.consultantName,
+              consultantId: data.consultantId || data.doctorId,
+              consultantName: data.consultantName || data.doctorId,
             };
           })
           .filter(n => n.consultantId && n.consultantName);
@@ -143,64 +183,68 @@ export default function Tracker({ navigation }) {
           </View>
         ) : null}
 
-        {/* Detail fields in a scrollable list */}
+        {/* ─── DETAIL SECTIONS ───────────────────────────────────── */}
         <ScrollView contentContainerStyle={styles.detailContainer}>
-          {[
-            { label: "Recorded On", value: n.createdAt.toLocaleString() },
-            { label: "Doctor", value: n.consultantName },
-            { label: "Blood Pressure", value: n.maternalHealth.bloodPressure },
-            {
-              label: "Weight Gain",
-              value: `${n.maternalHealth.weightGain} kg`
-            },
-            {
-              label: "Hemoglobin",
-              value: `${n.maternalHealth.hemoglobin} g/dL`
-            },
-            {
-              label: "Uterine Height",
-              value: `${n.maternalHealth.uterineHeight} cm`
-            },
-            { label: "Symptoms", value: n.maternalHealth.symptoms },
-            {
-              label: "Fetal Heart Rate",
-              value: `${n.fetalHealth.heartRate} bpm`
-            },
-            {
-              label: "Fetal Movements",
-              value: n.fetalHealth.movementFrequency
-            },
-            { label: "Presentation", value: n.fetalHealth.presentation },
-            {
-              label: "Gestational Age",
-              value: n.fetalHealth.gestationalAge
-            },
-            { label: "Amniotic Fluid", value: n.fetalHealth.amnioticFluid },
-            {
-              label: "Ultrasound Findings",
-              value: n.fetalHealth.ultrasoundFindings
-            },
-            { label: "Assessment", value: n.assessment },
-            { label: "Recommendations", value: n.recommendations }
-          ].map((item, idx) => (
-            <View key={idx} style={styles.detailRow}>
-              <Text style={styles.detailLabel}>{item.label}:</Text>
-              <Text style={styles.detailValue}>{item.value}</Text>
-            </View>
-          ))}
+          {renderSection("Maternal Health", n.maternalHealth)}
+          {renderSection("Pregnancy Screening", n.screening)}
+          {renderSection("Fetal Health", n.fetalHealth)}
+          {renderSection("Vital Signs", n.vitalSigns)}
+          {renderSection("Fetal Monitoring", n.fetalMonitoring)}
+          {renderSection("Core Labs", n.labs)}
+          {renderSection("Type & Screen", n.typeAndScreen)}
+          {renderSection("Blood Cultures & Ultrasound", {
+            "Blood Cultures Drawn": n.bloodCultures,
+            "Ultrasound Findings": n.ultrasoundFindings,
+          })}
+
+          {n.assessment && renderRow("Assessment", n.assessment)}
+          {n.recommendations && renderRow("Recommendations", n.recommendations)}
         </ScrollView>
       </SafeAreaView>
     );
   }
 
-  // ─── NOTES LIST FOR A SELECTED DOCTOR ────────────────────────────────────────
+  // ─── NOTES LIST FOR A SELECTED DOCTOR (with filtering) ───────────────────────
   if (selectedDoctorId) {
+    // all notes by this doctor
     const docNotes = notes.filter((n) => n.consultantId === selectedDoctorId);
+    // then filter by type
+    const filteredNotes =
+      filterType === "all"
+        ? docNotes
+        : docNotes.filter((n) => n.consultationType === filterType);
+
     const docName = doctors.find((d) => d.id === selectedDoctorId)?.name;
 
     return (
       <SafeAreaView style={styles.container}>
         <CustomHeader title={`${docName}'s Notes`} navigation={navigation} />
+
+        {/* ─── Filter buttons ─────────────────────────────────────── */}
+        <View style={styles.filterContainer}>
+          {["all", "pregnancy", "prenatal", "emergency"].map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[
+                styles.filterButton,
+                filterType === type && styles.filterButtonActive,
+              ]}
+              onPress={() => setFilterType(type)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  filterType === type && styles.filterTextActive,
+                ]}
+              >
+                {type === "all"
+                  ? "All"
+                  : type.charAt(0).toUpperCase() + type.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <TouchableOpacity
           onPress={() => setSelectedDoctorId(null)}
           style={styles.backButton}
@@ -209,7 +253,7 @@ export default function Tracker({ navigation }) {
         </TouchableOpacity>
 
         <FlatList
-          data={docNotes}
+          data={filteredNotes}
           keyExtractor={(i) => i.id}
           ListEmptyComponent={
             <Text style={styles.emptyText}>
@@ -267,6 +311,43 @@ export default function Tracker({ navigation }) {
   );
 }
 
+// ─── Helper functions ───────────────────────────────────────────────────────────
+function humanize(key) {
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (s) => s.toUpperCase());
+}
+
+function renderSection(title, dataObj) {
+  if (!dataObj) return null;
+  const entries = Object.entries(dataObj).filter(
+    ([, v]) => v !== undefined && v !== null && v !== ""
+  );
+  if (entries.length === 0) return null;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {entries.map(([key, value]) => (
+        <View key={key} style={styles.detailRow}>
+          <Text style={styles.detailLabel}>{humanize(key)}:</Text>
+          <Text style={styles.detailValue}>{value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function renderRow(label, value) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}:</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+}
+
+// ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -377,5 +458,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.textPrimary,
     marginTop: 2
-  }
+  },
+  filterContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  filterButton: {
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    margin: 4,
+  },
+  filterButtonActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  filterText: {
+    color: theme.colors.primary,
+  },
+  filterTextActive: {
+    color: "#fff",
+  },
+  section: {
+    marginVertical: 8,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    fontWeight: "600",
+    marginBottom: 4,
+  },
 });
